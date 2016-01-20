@@ -13,7 +13,8 @@ import pylab as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
 
-f_handle = open('ped_data.csv','r')
+# f_handle = open('ped_data.csv','r')
+f_handle = open('ped_data_2.csv','r')
 
 class AnimatedScatter(object):
 	def __init__(self, data):
@@ -24,13 +25,22 @@ class AnimatedScatter(object):
 		self.ani = animation.FuncAnimation(self.fig, self.update, interval=100, init_func=self.setup_plot, blit=True, frames=len(data)-1, repeat=False)
 
 	def setup_plot(self):
-		x, y, c, ct = next(self.stream)
+		x, y, c, ct, obj_id = next(self.stream)
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, s=128)
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.coolwarm, s=128)
 		self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.PuOr, s=128)
 		self.scat2 = self.ax.scatter(x, y, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
+		texts = []
+		_idx= 0
+		for ix,iy in zip(x, y):
+			text = self.ax.text(ix, iy + 0.3, str(obj_id[_idx]))
+			texts.append(text)
+			_idx = _idx + 1
 		self.ax.axis([0, 6, -5, 5])
-		return self.scat, self.scat2
+		clearables = [self.scat, self.scat2]
+		clearables = clearables + texts
+		# return self.scat, self.scat2
+		return clearables
 
 	def update(self, i):
 		data = next(self.stream)
@@ -42,11 +52,21 @@ class AnimatedScatter(object):
 		# self.scat.set_array(np.array(data[2]))
 		self.scat.set_color(data[2])
 		self.scat2.set_color(data[3])
+		texts = []
+		_idx= 0
+		for ix,iy in zip(data[0], data[1]):
+			text = self.ax.text(ix, iy + 0.3, str(data[4][_idx]))
+			texts.append(text)
+			_idx = _idx + 1
 		# self.scat.set_color(np.array(data[2]))
 		# self.scat.set_facecolor(np.column_stack((data[2], data[2])))
 		# self.scat.set_array(np.matrix(data[2]))
-		return self.scat, self.scat2
+		# return self.scat, self.scat2
 		# return self.scat,
+		clearables = [self.scat, self.scat2]
+		clearables = clearables + texts
+		# return self.scat, self.scat2
+		return clearables
 
 def plotPoints(data):
 	ax = plt.axes()
@@ -105,6 +125,7 @@ def animatePoints(data, tracks_munkres, max_obj_id):
 	points_timed = []
 	# tracks_timed = []
 
+	# print len(data), len(tracks_munkres)
 	_idx = 0
 	for frame in data:
 		if len(frame)>0:
@@ -117,6 +138,7 @@ def animatePoints(data, tracks_munkres, max_obj_id):
 			ys = []
 			cs = []
 			cst= []
+			obj_id = []
 			_i = 0
 			for _pp in frame:
 				# points_timed[-1][0].append(_pp[0]) # = points_timed[-1][0] + _pp[0]
@@ -126,10 +148,11 @@ def animatePoints(data, tracks_munkres, max_obj_id):
 				ys.append(_pp[1]) # = points_timed[-1][1] + _pp[1]
 				cs.append(colors[_i])
 				cst.append(colors_tracks[tracks_munkres[_idx][_i]])
+				obj_id.append(tracks_munkres[_idx][_i])
 				_i = _i + 1
-			points_timed[-1] = (xs, ys, cs, cst)
+			points_timed[-1] = (xs, ys, cs, cst, obj_id)
 			# tracks_timed[-1] = (xs, ys, cst)
-		_idx = _idx + 1
+			_idx = _idx + 1
 
 	# print points_timed
 
@@ -182,8 +205,8 @@ def processMunkres(points):
 					# track_new.append(valid_ids[row])
 					value = cost_matrix[row][column]
 					total += value
-					print '(%d, %d) -> %f' % (row, column, value)
-				print 'total cost: %f' % total
+					# print '(%d, %d) -> %f' % (row, column, value)
+				# print 'total cost: %f' % total
 				for row, column in indexes:
 					rows.append(row)
 					columns.append(column)
@@ -209,7 +232,7 @@ def processMunkres(points):
 				last_frame_idx = _frame_idx
 		_frame_idx = _frame_idx + 1
 
-	print tracks
+	# print tracks
 	return tracks, _obj_id-1
 	pass
 
