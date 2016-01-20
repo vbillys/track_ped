@@ -180,7 +180,7 @@ def createKF(x,y):
 	KF_P = np.diag([KF_pd, KF_pv,KF_pd, KF_pv])
 	KF_rd = 0.3
 	KF_R = np.diag([KF_rd,KF_rd])
-	KF_H = np.array([[1.,0],[0,1.]])
+	KF_H = np.array([[1.,0,0,0],[0,0,1.,0]])
 
 	kalman_filter.x = np.array([x,0,y,0])
 	kalman_filter.F = KF_F
@@ -193,6 +193,7 @@ def createKF(x,y):
 	return kalman_filter
 
 COST_MAX_GATING = 1.5
+DECAY_RATE = 0.8
 def processMunkresKalman(points):
 
 	kalman_filters = []
@@ -201,6 +202,7 @@ def processMunkresKalman(points):
 	tracks = []
 	tracks_KF = []
 	tracks_conf = []
+	tracks_KF_points = []
 	_frame_idx = 0
 	for frame in points:
 		if len(frame)>0:
@@ -208,21 +210,28 @@ def processMunkresKalman(points):
 				_first = True
 				track = []
 				track_conf = []
+				track_KF_point = []
 				_obj_id = 1
 				for leg in frame:
 					track.append(_obj_id)
 					kalman_filters.append(createKF(leg[0], leg[1]))
 					track_conf.append(leg[2])
+					track_KF_point.append([leg[0],leg[1]])
 					_obj_id = _obj_id + 1
 				tracks.append(track)
 				tracks_KF.append(track)
 				tracks_conf.append(track_conf)
+				tracks_KF_points.append(track_KF_point)
 				print track
 				track_KF = track
 				last_frame_idx = _frame_idx
 			else:
+				track_KF_point_new = []
 				for kf in kalman_filters:
 					kf.predict()
+					_x_updated = kf.x
+					track_KF_point_new.append([_x_updated[0], _x_updated[2]])
+				track_KF_point = track_KF_point_new
 				cost_matrix = []
 				# for prev_leg in points[last_frame_idx]:
 				_lidx = 0
@@ -235,14 +244,18 @@ def processMunkresKalman(points):
 						# valid_lidxs.append(_lidx)
 					cost_matrix.append([])
 					# no_of_object = no_of_object + 1
+					V = np.array([[kalman_filters[_lidx].P[0,0],kalman_filters[_lidx].P[0,2]],[kalman_filters[_lidx].P[2,0],kalman_filters[_lidx].P[2,2]]])
 					for leg in frame:
 						# _dist = math.hypot(prev_leg[0] - leg[0], prev_leg[1] - leg[1])
-						# V = np.array([[kalman_filters[_lidx].P[0,0],kalman_filters[_lidx].P[0,2]],[kalman_filters[_lidx].P[2,0],kalman_filters[_lidx].P[2,2]]])
 						# _mdist = mahalanobis(np.array([points[last_frame_idx][_lidx][0], points[last_frame_idx][_lidx][1]]),
 							    # np.array([leg[0],leg[1]]),
 							    # np.linalg.inv(V))
+						_mdist = mahalanobis(np.array([track_KF_point[_lidx][0], track_KF_point[_lidx][1]]),
+								np.array([leg[0],leg[1]]),
+								np.linalg.inv(V))
 						# print V, _mdist
-						_dist = math.hypot(points[last_frame_idx][_lidx][0] - leg[0], points[last_frame_idx][_lidx][1] - leg[1])
+						# _dist = math.hypot(points[last_frame_idx][_lidx][0] - leg[0], points[last_frame_idx][_lidx][1] - leg[1])
+						_dist = math.hypot(track_KF_point[_lidx][0] - leg[0], track_KF_point[_lidx][1] - leg[1])
 						cost_matrix[-1].append(_dist)
 					_lidx = _lidx + 1
 				# print _frame_idx, cost_matrix
@@ -251,6 +264,7 @@ def processMunkresKalman(points):
 				track_new = []
 				track_KF_new = []
 				track_conf_new = []
+				track_KF_point_new = []
 				kalman_filters_new = []
 				rows = []
 				columns = []
@@ -271,15 +285,22 @@ def processMunkresKalman(points):
 						# add new obj id for unassigned measurements
 						track_new.append(_obj_id)
 						kalman_filters_new.append(createKF(frame[i][0], frame[i][1]))
+						track_KF_point_new.append([frame[i][0], frame[i][1]])
 						track_KF_new.append(_obj_id)
 						track_conf_new.append(frame[i][2])
 						_obj_id = _obj_id + 1
 					else:
 						# unassigned tracked ids (Munkres) die immediately
+						# compute for assigned tracks
 						track_new.append(track[rows[columns.index(i)]])
 						kalman_filters_new.append(kalman_filters[rows[columns.index(i)]])
+						# kalman_filters[rows[columns.index(i)]].update(np.array([frame[i][0], frame[i][1]]))
+						kalman_filters[rows[columns.index(i)]].update([frame[i][0], frame[i][1]])
+						_x_updated = kalman_filters[rows[columns.index(i)]].x
+						track_KF_point_new.append([_x_updated[0], _x_updated[2]])
+
 						track_KF_new.append(track[rows[columns.index(i)]])
-						track_conf_new.append(track_conf[rows[columns.index(i)]])
+						track_conf_new.append(track_conf[rows[columns.index(i)]]*DECAY_RATE + frame[i][2]*(1-DECAY_RATE))
 
 				# # Maintain unassinged KF tracks
 				# if len(rows) < len(track_KF):
@@ -290,11 +311,14 @@ def processMunkresKalman(points):
 				track_KF = track_KF_new
 				track = track_new
 				track_conf = track_conf_new
+				track_KF_point = track_KF_point_new
 
 				print track, track_KF, track_conf
+				# print frame, track_KF_point
 				tracks.append(track)
 				tracks_KF.append(track_KF)
 				tracks_conf.append(track_conf)
+				tracks_KF_points.append(track_KF_point)
 
 				last_frame_idx = _frame_idx
 		_frame_idx = _frame_idx + 1
