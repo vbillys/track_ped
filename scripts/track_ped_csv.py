@@ -15,8 +15,8 @@ import pylab as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
 
-f_handle = open('ped_data.csv','r')
-# f_handle = open('ped_data_2.csv','r')
+# f_handle = open('ped_data.csv','r')
+f_handle = open('ped_data_2.csv','r')
 
 
 
@@ -217,7 +217,7 @@ def createKF(x,y):
 	KF_pd = 25.
 	KF_pv = 10.
 	KF_P = np.diag([KF_pd, KF_pv,KF_pd, KF_pv])
-	KF_rd = 0.3
+	KF_rd = 0.05
 	KF_R = np.diag([KF_rd,KF_rd])
 	KF_H = np.array([[1.,0,0,0],[0,0,1.,0]])
 
@@ -244,9 +244,10 @@ def squareMatrix(mat, fillconstant):
 
 	return newmat
 
-COST_MAX_GATING = 1.5
+COST_MAX_GATING = .7 #1.5
 DECAY_RATE = 0.93
 DECAY_THRES = 0.3
+RMAHALANOBIS = 2.
 def processMunkresKalman(points):
 
 	kalman_filters = []
@@ -300,7 +301,8 @@ def processMunkresKalman(points):
 					# V = np.array([[kalman_filters[_lidx].P[0,0],kalman_filters[_lidx].P[0,2]],[kalman_filters[_lidx].P[2,0],kalman_filters[_lidx].P[2,2]]])
 					# V = np.array([[kalman_filters[_lidx].S[0,0],kalman_filters[_lidx].S[0,2]],[kalman_filters[_lidx].S[2,0],kalman_filters[_lidx].S[2,2]]])
 					# V = kalman_filters[_lidx].S
-					V = dot3(kalman_filters[_lidx].H, kalman_filters[_lidx].P, kalman_filters[_lidx].H.T) + np.array([[0.5,0],[0,.5]])
+					
+					V = dot3(kalman_filters[_lidx].H, kalman_filters[_lidx].P, kalman_filters[_lidx].H.T) + np.array([[RMAHALANOBIS,0],[0,RMAHALANOBIS]])
 					# print V
 					for leg in frame:
 						# _dist = math.hypot(prev_leg[0] - leg[0], prev_leg[1] - leg[1])
