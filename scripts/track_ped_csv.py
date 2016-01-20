@@ -15,8 +15,8 @@ import pylab as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
 
-f_handle = open('ped_data.csv','r')
-# f_handle = open('ped_data_2.csv','r')
+# f_handle = open('ped_data.csv','r')
+f_handle = open('ped_data_2.csv','r')
 
 
 
@@ -243,7 +243,7 @@ def squareMatrix(mat, fillconstant):
 	return newmat
 
 COST_MAX_GATING = 1.5
-DECAY_RATE = 0.9
+DECAY_RATE = 0.93
 DECAY_THRES = 0.5
 def processMunkresKalman(points):
 
@@ -342,10 +342,11 @@ def processMunkresKalman(points):
 					columns.append(column)
 					# track_new.append(track[row])
 				# for i in range(len(points[last_frame_idx])):
+				print rows, columns
 
 				for i in range(len(frame)):
-					if i not in columns: # or cost_matrix[rows[columns.index(i)]][i] > COST_MAX_GATING:
-					# if i not in columns or cost_matrix[rows[columns.index(i)]][i] > COST_MAX_GATING:
+					# if i not in columns: # or cost_matrix[rows[columns.index(i)]][i] > COST_MAX_GATING:
+					if i not in columns or cost_matrix[rows[columns.index(i)]][i] >= COST_MAX_GATING:
 						# add new obj id for unassigned measurements
 						print 'added new object'
 						track_new.append(_obj_id)
@@ -356,8 +357,8 @@ def processMunkresKalman(points):
 						_obj_id = _obj_id + 1
 					else:
 						# print i, columns.index(i), rows[columns.index(i)], cost_matrix
-						if cost_matrix[rows[columns.index(i)]][i] >= COST_MAX_GATING:
-							continue
+						# if cost_matrix[rows[columns.index(i)]][i] >= COST_MAX_GATING:
+							# continue
 						# unassigned tracked ids (Munkres) die immediately
 						# compute for assigned tracks
 						track_new.append(track[rows[columns.index(i)]])
@@ -373,11 +374,13 @@ def processMunkresKalman(points):
 				# # Maintain unassinged KF tracks
 				if len(rows) < len(track_KF):
 					# if len(columns) < len(rows):
+					print 'got orphaned KF...'
 					for kf_obji in track_KF:
 						if kf_obji not in track_KF_new:
 							_index = track_KF.index(kf_obji)
 							_conf = track_conf[_index]*DECAY_RATE
 							if _conf > DECAY_THRES:
+								print 'maintaining', kf_obji
 								kalman_filters_new.append(kalman_filters[_index])
 								track_conf_new.append(_conf)
 								track_KF_point_new.append([track_KF_point[_index][0],track_KF_point[_index][1]])
@@ -391,7 +394,7 @@ def processMunkresKalman(points):
 				track_conf = track_conf_new
 				track_KF_point = track_KF_point_new
 
-				print track, track_KF, track_conf
+				print track, track_conf
 				# print frame, track_KF_point
 				tracks.append(track)
 				tracks_KF.append(track_KF)
