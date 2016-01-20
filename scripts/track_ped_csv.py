@@ -4,6 +4,7 @@ from munkres import Munkres
 from scipy.spatial.distance import mahalanobis
 # import book_format
 # import book_plots
+import math
 
 import numpy as np
 # from matplotlib.patches import Circle, Rectangle, Polygon, Arrow, FancyArrow
@@ -23,11 +24,11 @@ class AnimatedScatter(object):
 		self.ani = animation.FuncAnimation(self.fig, self.update, interval=100, init_func=self.setup_plot, blit=True, frames=len(data)-1, repeat=False)
 
 	def setup_plot(self):
-		x, y, c = next(self.stream)
+		x, y, c, ct = next(self.stream)
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, s=128)
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.coolwarm, s=128)
 		self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.PuOr, s=128)
-		self.scat2 = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
+		self.scat2 = self.ax.scatter(x, y, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
 		self.ax.axis([0, 6, -5, 5])
 		return self.scat, self.scat2
 
@@ -40,7 +41,7 @@ class AnimatedScatter(object):
 		# print np.array(data[2])
 		# self.scat.set_array(np.array(data[2]))
 		self.scat.set_color(data[2])
-		self.scat2.set_color(data[2])
+		self.scat2.set_color(data[3])
 		# self.scat.set_color(np.array(data[2]))
 		# self.scat.set_facecolor(np.column_stack((data[2], data[2])))
 		# self.scat.set_array(np.matrix(data[2]))
@@ -92,25 +93,30 @@ def plotPoints(data):
 	# a = AnimatedScatter(points_tracked)
 	# plt.show()
 
-def animatePoints(data):
+def animatePoints(data, tracks_munkres, max_obj_id):
 	maxlen = len(max(data,key=len))
 	print 'maxlen',maxlen
 	colors = cm.rainbow(np.linspace(0, 1, maxlen))
+	colors_tracks = cm.rainbow(np.linspace(0, 1, max_obj_id+2))
 	# colors = np.linspace(.1, .88, maxlen)
 	# colors = np.linspace(-0.02, .02, maxlen)
 	# colors = np.random.random(maxlen)
 	# colors = [0, 105, 7, 8]
 	points_timed = []
+	# tracks_timed = []
 
+	_idx = 0
 	for frame in data:
 		if len(frame)>0:
 			points_timed.append([])
+			# tracks_timed.append([])
 			# points_timed[-1].append([])
 			# points_timed[-1].append([])
 			# points_timed[-1].append([])
 			xs = []
 			ys = []
 			cs = []
+			cst= []
 			_i = 0
 			for _pp in frame:
 				# points_timed[-1][0].append(_pp[0]) # = points_timed[-1][0] + _pp[0]
@@ -119,8 +125,11 @@ def animatePoints(data):
 				xs.append(_pp[0]) # = points_timed[-1][0] + _pp[0]
 				ys.append(_pp[1]) # = points_timed[-1][1] + _pp[1]
 				cs.append(colors[_i])
+				cst.append(colors_tracks[tracks_munkres[_idx][_i]])
 				_i = _i + 1
-			points_timed[-1] = (xs, ys, cs)
+			points_timed[-1] = (xs, ys, cs, cst)
+			# tracks_timed[-1] = (xs, ys, cst)
+		_idx = _idx + 1
 
 	# print points_timed
 
@@ -129,7 +138,79 @@ def animatePoints(data):
 
 
 def processMunkres(points):
-	return []
+	munkres = Munkres()
+	_first = False
+	tracks = []
+	_frame_idx = 0
+	for frame in points:
+		if len(frame)>0:
+			if not _first:
+				_first = True
+				track = []
+				_obj_id = 1
+				for leg in frame:
+					track.append(_obj_id)
+					_obj_id = _obj_id + 1
+				tracks.append(track)
+				print track
+				last_frame_idx = _frame_idx
+			else:
+				cost_matrix = []
+				# for prev_leg in points[last_frame_idx]:
+				_lidx = 0
+				# no_of_object = 0
+				# valid_ids = []
+				# valid_lidxs = []
+				for objid in track:
+					# if objid != 0:
+						# valid_ids.append(objid)
+						# valid_lidxs.append(_lidx)
+					cost_matrix.append([])
+					# no_of_object = no_of_object + 1
+					for leg in frame:
+						# _dist = math.hypot(prev_leg[0] - leg[0], prev_leg[1] - leg[1])
+						_dist = math.hypot(points[last_frame_idx][_lidx][0] - leg[0], points[last_frame_idx][_lidx][1] - leg[1])
+						cost_matrix[-1].append(_dist)
+					_lidx = _lidx + 1
+				# print _frame_idx, cost_matrix
+				indexes = munkres.compute(cost_matrix)
+				total = 0.
+				track_new = []
+				rows = []
+				columns = []
+				for row, column in indexes:
+					# track_new.append(valid_ids[row])
+					value = cost_matrix[row][column]
+					total += value
+					print '(%d, %d) -> %f' % (row, column, value)
+				print 'total cost: %f' % total
+				for row, column in indexes:
+					rows.append(row)
+					columns.append(column)
+					# track_new.append(track[row])
+				# for i in range(len(points[last_frame_idx])):
+
+				# if len(columns) > len(rows):
+				for i in range(len(frame)):
+					if i not in columns:
+						# add new obj id for unassigned measurements
+						track_new.append(_obj_id)
+						_obj_id = _obj_id + 1
+					else:
+						# unassigned tracked ids die immediately
+						track_new.append(track[rows[columns.index(i)]])
+
+
+
+				track = track_new
+				print track
+				tracks.append(track)
+
+				last_frame_idx = _frame_idx
+		_frame_idx = _frame_idx + 1
+
+	print tracks
+	return tracks, _obj_id-1
 	pass
 
 def grouper(n, iterable, fillvalue=None):
@@ -149,9 +230,9 @@ for str_ in f_content:
 	print point
 	points.append(point)
 print points
-points_processed = processMunkres(points)
+tracks_munkres , max_obj_id = processMunkres(points)
 plotPoints(points)
-animatePoints(points)
+animatePoints(points, tracks_munkres, max_obj_id)
 # plotPoints(points_processed)
 # animatePoints(points_processed)
 
