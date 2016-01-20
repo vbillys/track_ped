@@ -5,6 +5,7 @@ from mech_input.msg import LegMeasurementArray, LegMeasurement
 
 
 f_handle = open('ped_data.csv','w')
+# f_handle = open('ped_data_2.csv','w')
 
 def processLegArray(msg):
 	print msg
@@ -19,6 +20,7 @@ def processLegArray(msg):
 				continue
 			str_= str_  + format(l.xLeg,'.3f')+ ' '
 			str_= str_  + format(l.yLeg,'.3f')+ ' '
+			str_= str_  + format(l.ConLeg,'.3f')+ ' '
 		str_ = str_ + '\n'
 		print str_
 		f_handle.write(str_)

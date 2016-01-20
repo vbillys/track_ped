@@ -2,6 +2,8 @@
 import itertools
 from munkres import Munkres
 from scipy.spatial.distance import mahalanobis
+from filterpy.kalman import KalmanFilter
+from filterpy.common import Q_discrete_white_noise
 # import book_format
 # import book_plots
 import math
@@ -15,6 +17,9 @@ import matplotlib.animation as animation
 
 # f_handle = open('ped_data.csv','r')
 f_handle = open('ped_data_2.csv','r')
+
+
+
 
 class AnimatedScatter(object):
 	def __init__(self, data):
@@ -159,11 +164,40 @@ def animatePoints(data, tracks_munkres, max_obj_id):
 	a = AnimatedScatter(points_timed)
 	plt.show()
 
+def createKF(x,y):
+	kalman_filter = KalmanFilter(dim_x=4, dim_z=2)
+	dt = .1
+	KF_F = np.array([[1., dt, 0 ,  0],
+		[0 , 1., 0 ,  0],
+		[0 , 0 , 1., dt],
+		[0 , 0 , 0 , 1.]])
+	KF_q = 0.2
+	KF_Q = np.vstack((np.hstack((Q_discrete_white_noise(2, dt=0.1, var=KF_q),np.zeros((2,2)))),np.hstack((np.zeros((2,2)),Q_discrete_white_noise(2, dt=0.1, var=KF_q)))))
+	KF_pd = 25.
+	KF_pv = 10.
+	KF_P = np.diag([KF_pd, KF_pv,KF_pd, KF_pv])
+	KF_rd = 0.3
+	KF_R = np.diag([KF_rd,KF_rd])
+	KF_H = np.array([[1.,0],[0,1.]])
 
-def processMunkres(points):
+	kalman_filter.x = np.array([x,0,y,0])
+	kalman_filter.F = KF_F
+	kalman_filter.H = KF_H
+	kalman_filter.Q = KF_Q
+	kalman_filter.B = 0
+	kalman_filter.R = KF_R
+	kalman_filter.P = KF_P
+
+	return kalman_filter
+
+COST_MAX_GATING = 1.5
+def processMunkresKalman(points):
+
+	kalman_filters = []
 	munkres = Munkres()
 	_first = False
 	tracks = []
+	tracks_KF = []
 	_frame_idx = 0
 	for frame in points:
 		if len(frame)>0:
@@ -173,11 +207,15 @@ def processMunkres(points):
 				_obj_id = 1
 				for leg in frame:
 					track.append(_obj_id)
+					kalman_filters.append(createKF(leg[0], leg[1]))
 					_obj_id = _obj_id + 1
 				tracks.append(track)
 				print track
+				track_KF = track
 				last_frame_idx = _frame_idx
 			else:
+				for kf in kalman_filters:
+					kf.predict()
 				cost_matrix = []
 				# for prev_leg in points[last_frame_idx]:
 				_lidx = 0
@@ -192,6 +230,11 @@ def processMunkres(points):
 					# no_of_object = no_of_object + 1
 					for leg in frame:
 						# _dist = math.hypot(prev_leg[0] - leg[0], prev_leg[1] - leg[1])
+						# V = np.array([[kalman_filters[_lidx].P[0,0],kalman_filters[_lidx].P[0,2]],[kalman_filters[_lidx].P[2,0],kalman_filters[_lidx].P[2,2]]])
+						# _mdist = mahalanobis(np.array([points[last_frame_idx][_lidx][0], points[last_frame_idx][_lidx][1]]),
+							    # np.array([leg[0],leg[1]]),
+							    # np.linalg.inv(V))
+						# print V, _mdist
 						_dist = math.hypot(points[last_frame_idx][_lidx][0] - leg[0], points[last_frame_idx][_lidx][1] - leg[1])
 						cost_matrix[-1].append(_dist)
 					_lidx = _lidx + 1
@@ -199,6 +242,8 @@ def processMunkres(points):
 				indexes = munkres.compute(cost_matrix)
 				total = 0.
 				track_new = []
+				track_KF_new = []
+				kalman_filters_new = []
 				rows = []
 				columns = []
 				for row, column in indexes:
@@ -215,19 +260,25 @@ def processMunkres(points):
 
 				# if len(columns) > len(rows):
 				for i in range(len(frame)):
-					if i not in columns:
+					if i not in columns or cost_matrix[rows[columns.index(i)]][i] > COST_MAX_GATING:
 						# add new obj id for unassigned measurements
 						track_new.append(_obj_id)
+						kalman_filters_new.append(createKF(frame[i][0], frame[i][1]))
+						track_KF_new.append(_obj_id)
 						_obj_id = _obj_id + 1
 					else:
 						# unassigned tracked ids die immediately
 						track_new.append(track[rows[columns.index(i)]])
+						kalman_filters_new.append(kalman_filters[rows[columns.index(i)]])
+						track_KF_new.append(track[rows[columns.index(i)]])
 
-
+				kalman_filters = kalman_filters_new
+				track_KF = track_KF_new
 
 				track = track_new
 				print track
 				tracks.append(track)
+				tracks_KF.append(track_KF)
 
 				last_frame_idx = _frame_idx
 		_frame_idx = _frame_idx + 1
@@ -249,11 +300,12 @@ for str_ in f_content:
 	point_ = map(float, strs.split())
 	print point_
 	# point = list(grouper(2, point_))
-	point = zip(*(iter(point_),) * 2)
+	point = zip(*(iter(point_),) * 3)
 	print point
 	points.append(point)
 print points
-tracks_munkres , max_obj_id = processMunkres(points)
+# tracks_munkres , max_obj_id = processMunkres(points)
+tracks_munkres , max_obj_id = processMunkresKalman(points)
 plotPoints(points)
 animatePoints(points, tracks_munkres, max_obj_id)
 # plotPoints(points_processed)
