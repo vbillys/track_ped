@@ -15,8 +15,8 @@ import pylab as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
 
-f_handle = open('ped_data.csv','r')
-# f_handle = open('ped_data_2.csv','r')
+# f_handle = open('ped_data.csv','r')
+f_handle = open('ped_data_2.csv','r')
 
 
 
@@ -34,6 +34,7 @@ class AnimatedScatter(object):
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, s=128)
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.coolwarm, s=128)
 		self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.PuOr, s=128)
+		self.ax.axis([0, 6, -5, 5])
 		if len(ct) > 0:
 			self.scat2 = self.ax.scatter(xkf, ykf, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
 			texts = []
@@ -52,9 +53,10 @@ class AnimatedScatter(object):
 				_idx = _idx + 1
 			clearables = [self.scat, self.scat2]
 			clearables = clearables + texts
+			return clearables
 		else:
 			clearables = self.scat
-		self.ax.axis([0, 6, -5, 5])
+			return clearables,
 		# return self.scat, self.scat2
 		return clearables
 
@@ -89,8 +91,10 @@ class AnimatedScatter(object):
 		# return self.scat,
 			clearables = [self.scat, self.scat2]
 			clearables = clearables + texts
+			return clearables
 		else:
 			clearables = self.scat
+			return clearables,
 		# return self.scat, self.scat2
 		return clearables
 
