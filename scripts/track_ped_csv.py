@@ -30,14 +30,19 @@ class AnimatedScatter(object):
 		self.ani = animation.FuncAnimation(self.fig, self.update, interval=100, init_func=self.setup_plot, blit=True, frames=len(data)-1, repeat=False)
 
 	def setup_plot(self):
-		x, y, c, ct, obj_id = next(self.stream)
+		x, y, c, ct, obj_id, xkf, ykf = next(self.stream)
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, s=128)
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.coolwarm, s=128)
 		self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.PuOr, s=128)
-		self.scat2 = self.ax.scatter(x, y, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
+		self.scat2 = self.ax.scatter(xkf, ykf, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
 		texts = []
 		_idx= 0
 		for ix,iy in zip(x, y):
+			text = self.ax.text(ix, iy + 0.3, str(obj_id[_idx]))
+			texts.append(text)
+			_idx = _idx + 1
+		_idx= 0
+		for ix,iy in zip(xkf, ykf):
 			text = self.ax.text(ix, iy + 0.3, str(obj_id[_idx]))
 			texts.append(text)
 			_idx = _idx + 1
@@ -51,7 +56,7 @@ class AnimatedScatter(object):
 		data = next(self.stream)
 		# self.scat.set_offsets(data[:2, :])
 		self.scat.set_offsets(np.column_stack((data[0], data[1])))
-		self.scat2.set_offsets(np.column_stack((data[0], data[1])))
+		self.scat2.set_offsets(np.column_stack((data[5], data[6])))
 		# self.scat._sizes = 300 * abs(data[2])**1.5 + 100
 		# print np.array(data[2])
 		# self.scat.set_array(np.array(data[2]))
@@ -60,6 +65,11 @@ class AnimatedScatter(object):
 		texts = []
 		_idx= 0
 		for ix,iy in zip(data[0], data[1]):
+			text = self.ax.text(ix, iy + 0.3, str(data[4][_idx]))
+			texts.append(text)
+			_idx = _idx + 1
+		_idx= 0
+		for ix,iy in zip(data[5], data[6]):
 			text = self.ax.text(ix, iy + 0.3, str(data[4][_idx]))
 			texts.append(text)
 			_idx = _idx + 1
@@ -118,7 +128,7 @@ def plotPoints(data):
 	# a = AnimatedScatter(points_tracked)
 	# plt.show()
 
-def animatePoints(data, tracks_munkres, max_obj_id):
+def animatePoints(data, tracks_munkres, max_obj_id, KF_points):
 	maxlen = len(max(data,key=len))
 	print 'maxlen',maxlen
 	colors = cm.rainbow(np.linspace(0, 1, maxlen))
@@ -144,6 +154,8 @@ def animatePoints(data, tracks_munkres, max_obj_id):
 			cs = []
 			cst= []
 			obj_id = []
+			xskf = []
+			yskf = []
 			_i = 0
 			for _pp in frame:
 				# points_timed[-1][0].append(_pp[0]) # = points_timed[-1][0] + _pp[0]
@@ -153,9 +165,11 @@ def animatePoints(data, tracks_munkres, max_obj_id):
 				ys.append(_pp[1]) # = points_timed[-1][1] + _pp[1]
 				cs.append(colors[_i])
 				cst.append(colors_tracks[tracks_munkres[_idx][_i]])
+				xskf.append(KF_points[_idx][_i][0])
+				yskf.append(KF_points[_idx][_i][1])
 				obj_id.append(tracks_munkres[_idx][_i])
 				_i = _i + 1
-			points_timed[-1] = (xs, ys, cs, cst, obj_id)
+			points_timed[-1] = (xs, ys, cs, cst, obj_id, xskf, yskf)
 			# tracks_timed[-1] = (xs, ys, cst)
 			_idx = _idx + 1
 
@@ -311,6 +325,7 @@ def processMunkresKalman(points):
 				# if len(rows) < len(track_KF):
 					# # if len(columns) < len(rows):
 					# for kf_obji in track_KF:
+						# if kf_obji not in track_KF_new:
 
 				kalman_filters = kalman_filters_new
 				track_KF = track_KF_new
@@ -329,7 +344,7 @@ def processMunkresKalman(points):
 		_frame_idx = _frame_idx + 1
 
 	# print tracks
-	return tracks, _obj_id-1
+	return tracks, _obj_id-1, tracks_KF_points
 	pass
 
 def grouper(n, iterable, fillvalue=None):
@@ -350,9 +365,9 @@ for str_ in f_content:
 	points.append(point)
 print points
 # tracks_munkres , max_obj_id = processMunkres(points)
-tracks_munkres , max_obj_id = processMunkresKalman(points)
+tracks_munkres , max_obj_id , tracks_KF_points= processMunkresKalman(points)
 plotPoints(points)
-animatePoints(points, tracks_munkres, max_obj_id)
+animatePoints(points, tracks_munkres, max_obj_id, tracks_KF_points)
 # plotPoints(points_processed)
 # animatePoints(points_processed)
 
