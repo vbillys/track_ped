@@ -3,7 +3,7 @@ import itertools
 from munkres import Munkres
 from scipy.spatial.distance import mahalanobis
 from filterpy.kalman import KalmanFilter
-from filterpy.common import Q_discrete_white_noise
+from filterpy.common import Q_discrete_white_noise, dot3
 # import book_format
 # import book_plots
 import math
@@ -15,8 +15,8 @@ import pylab as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
 
-# f_handle = open('ped_data.csv','r')
-f_handle = open('ped_data_2.csv','r')
+f_handle = open('ped_data.csv','r')
+# f_handle = open('ped_data_2.csv','r')
 
 
 
@@ -244,7 +244,11 @@ def processMunkresKalman(points):
 						# valid_lidxs.append(_lidx)
 					cost_matrix.append([])
 					# no_of_object = no_of_object + 1
-					V = np.array([[kalman_filters[_lidx].P[0,0],kalman_filters[_lidx].P[0,2]],[kalman_filters[_lidx].P[2,0],kalman_filters[_lidx].P[2,2]]])
+					# V = np.array([[kalman_filters[_lidx].P[0,0],kalman_filters[_lidx].P[0,2]],[kalman_filters[_lidx].P[2,0],kalman_filters[_lidx].P[2,2]]])
+					# V = np.array([[kalman_filters[_lidx].S[0,0],kalman_filters[_lidx].S[0,2]],[kalman_filters[_lidx].S[2,0],kalman_filters[_lidx].S[2,2]]])
+					# V = kalman_filters[_lidx].S
+					V = dot3(kalman_filters[_lidx].H, kalman_filters[_lidx].P, kalman_filters[_lidx].H.T) + np.array([[0.5,0],[0,.5]])
+					# print V
 					for leg in frame:
 						# _dist = math.hypot(prev_leg[0] - leg[0], prev_leg[1] - leg[1])
 						# _mdist = mahalanobis(np.array([points[last_frame_idx][_lidx][0], points[last_frame_idx][_lidx][1]]),
@@ -256,7 +260,8 @@ def processMunkresKalman(points):
 						# print V, _mdist
 						# _dist = math.hypot(points[last_frame_idx][_lidx][0] - leg[0], points[last_frame_idx][_lidx][1] - leg[1])
 						_dist = math.hypot(track_KF_point[_lidx][0] - leg[0], track_KF_point[_lidx][1] - leg[1])
-						cost_matrix[-1].append(_dist)
+						# cost_matrix[-1].append(_dist)
+						cost_matrix[-1].append(_mdist)
 					_lidx = _lidx + 1
 				# print _frame_idx, cost_matrix
 				indexes = munkres.compute(cost_matrix)
