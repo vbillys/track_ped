@@ -15,8 +15,8 @@ import pylab as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
 
-# f_handle = open('ped_data.csv','r')
-f_handle = open('ped_data_2.csv','r')
+f_handle = open('ped_data.csv','r')
+# f_handle = open('ped_data_2.csv','r')
 
 
 
@@ -34,7 +34,8 @@ class AnimatedScatter(object):
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, s=128)
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.coolwarm, s=128)
 		self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.PuOr, s=128)
-		self.ax.axis([0, 6, -5, 5])
+		# self.ax.axis([0, 6, -5, 5])
+		self.ax.axis([0, 10, -10, 10])
 		if len(ct) > 0:
 			self.scat2 = self.ax.scatter(xkf, ykf, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
 			texts = []
@@ -137,7 +138,8 @@ def plotPoints(data):
 
 	ax.xaxis.grid(True, which="major", linestyle='dotted')
 	ax.yaxis.grid(True, which="major", linestyle='dotted')
-	ax.axis([0, 6, -5, 5])
+	# ax.axis([0, 6, -5, 5])
+	ax.axis([0, 10, -10, 10])
 	# print points_tracked
 	# print colors
 	# a = AnimatedScatter(points_tracked)
@@ -210,7 +212,7 @@ def createKF(x,y):
 		[0 , 1., 0 ,  0],
 		[0 , 0 , 1., dt],
 		[0 , 0 , 0 , 1.]])
-	KF_q = 0.2
+	KF_q = 0.3
 	KF_Q = np.vstack((np.hstack((Q_discrete_white_noise(2, dt=0.1, var=KF_q),np.zeros((2,2)))),np.hstack((np.zeros((2,2)),Q_discrete_white_noise(2, dt=0.1, var=KF_q)))))
 	KF_pd = 25.
 	KF_pv = 10.
@@ -244,7 +246,7 @@ def squareMatrix(mat, fillconstant):
 
 COST_MAX_GATING = 1.5
 DECAY_RATE = 0.93
-DECAY_THRES = 0.5
+DECAY_THRES = 0.3
 def processMunkresKalman(points):
 
 	kalman_filters = []
@@ -342,13 +344,13 @@ def processMunkresKalman(points):
 					columns.append(column)
 					# track_new.append(track[row])
 				# for i in range(len(points[last_frame_idx])):
-				print rows, columns
+				# print rows, columns
 
 				for i in range(len(frame)):
 					# if i not in columns: # or cost_matrix[rows[columns.index(i)]][i] > COST_MAX_GATING:
 					if i not in columns or cost_matrix[rows[columns.index(i)]][i] >= COST_MAX_GATING:
 						# add new obj id for unassigned measurements
-						print 'added new object'
+						# print 'added new object'
 						track_new.append(_obj_id)
 						kalman_filters_new.append(createKF(frame[i][0], frame[i][1]))
 						track_KF_point_new.append([frame[i][0], frame[i][1]])
@@ -372,20 +374,20 @@ def processMunkresKalman(points):
 						track_conf_new.append(track_conf[rows[columns.index(i)]]*DECAY_RATE + frame[i][2]*(1-DECAY_RATE))
 
 				# # Maintain unassinged KF tracks
-				if len(rows) < len(track_KF):
+				# if len(rows) < len(track_KF):
 					# if len(columns) < len(rows):
-					print 'got orphaned KF...'
-					for kf_obji in track_KF:
-						if kf_obji not in track_KF_new:
-							_index = track_KF.index(kf_obji)
-							_conf = track_conf[_index]*DECAY_RATE
-							if _conf > DECAY_THRES:
-								print 'maintaining', kf_obji
-								kalman_filters_new.append(kalman_filters[_index])
-								track_conf_new.append(_conf)
-								track_KF_point_new.append([track_KF_point[_index][0],track_KF_point[_index][1]])
-								track_new.append(kf_obji)
-								track_KF_new.append(kf_obji)
+					# print 'got orphaned KF...'
+				for kf_obji in track_KF:
+					if kf_obji not in track_KF_new:
+						_index = track_KF.index(kf_obji)
+						_conf = track_conf[_index]*DECAY_RATE
+						if _conf > DECAY_THRES:
+							# print 'maintaining', kf_obji
+							kalman_filters_new.append(kalman_filters[_index])
+							track_conf_new.append(_conf)
+							track_KF_point_new.append([track_KF_point[_index][0],track_KF_point[_index][1]])
+							track_new.append(kf_obji)
+							track_KF_new.append(kf_obji)
 
 
 				kalman_filters = kalman_filters_new
@@ -404,7 +406,7 @@ def processMunkresKalman(points):
 				last_frame_idx = _frame_idx
 		_frame_idx = _frame_idx + 1
 
-	print tracks
+	# print tracks
 	return tracks, _obj_id-1, tracks_KF_points
 	pass
 
@@ -419,12 +421,12 @@ for str_ in f_content:
 	strs = str_.strip()
 	# point_ = strs.split(' ')
 	point_ = map(float, strs.split())
-	print point_
+	# print point_
 	# point = list(grouper(2, point_))
 	point = zip(*(iter(point_),) * 3)
-	print point
+	# print point
 	points.append(point)
-print points
+# print points
 # tracks_munkres , max_obj_id = processMunkres(points)
 tracks_munkres , max_obj_id , tracks_KF_points= processMunkresKalman(points)
 plotPoints(points)
