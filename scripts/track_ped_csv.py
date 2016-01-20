@@ -15,8 +15,8 @@ import pylab as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
 
-# f_handle = open('ped_data.csv','r')
-f_handle = open('ped_data_2.csv','r')
+f_handle = open('ped_data.csv','r')
+# f_handle = open('ped_data_2.csv','r')
 
 
 
@@ -229,6 +229,19 @@ def createKF(x,y):
 
 	return kalman_filter
 
+def squareMatrix(mat, fillconstant):
+	nrow , ncolumn = len(mat), len(mat[0])
+	newmat = mat
+	if nrow < ncolumn:
+		for i in range(ncolumn - nrow):
+			newmat.append([fillconstant]*ncolumn)
+	elif ncolumn > nrow:
+		for i in range(nrow - ncolumn):
+			for _m in newmat:
+				_m.append(fillconstant)
+
+	return newmat
+
 COST_MAX_GATING = 1.5
 DECAY_RATE = 0.9
 DECAY_THRES = 0.5
@@ -314,6 +327,8 @@ def processMunkresKalman(points):
 				indexes = []
 
 				if _lidx > 0:
+					cost_matrix = squareMatrix(cost_matrix, COST_MAX_GATING)
+					# print cost_matrix
 					indexes = munkres.compute(cost_matrix)
 
 				for row, column in indexes:
@@ -341,7 +356,7 @@ def processMunkresKalman(points):
 						_obj_id = _obj_id + 1
 					else:
 						# print i, columns.index(i), rows[columns.index(i)], cost_matrix
-						if cost_matrix[rows[columns.index(i)]][i] > COST_MAX_GATING:
+						if cost_matrix[rows[columns.index(i)]][i] >= COST_MAX_GATING:
 							continue
 						# unassigned tracked ids (Munkres) die immediately
 						# compute for assigned tracks
