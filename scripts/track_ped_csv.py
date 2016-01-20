@@ -164,6 +164,8 @@ def animatePoints(data, tracks_munkres, max_obj_id):
 	a = AnimatedScatter(points_timed)
 	plt.show()
 
+# class KalmanFilterWithConf(KalmanFilter):
+
 def createKF(x,y):
 	kalman_filter = KalmanFilter(dim_x=4, dim_z=2)
 	dt = .1
@@ -198,18 +200,23 @@ def processMunkresKalman(points):
 	_first = False
 	tracks = []
 	tracks_KF = []
+	tracks_conf = []
 	_frame_idx = 0
 	for frame in points:
 		if len(frame)>0:
 			if not _first:
 				_first = True
 				track = []
+				track_conf = []
 				_obj_id = 1
 				for leg in frame:
 					track.append(_obj_id)
 					kalman_filters.append(createKF(leg[0], leg[1]))
+					track_conf.append(leg[2])
 					_obj_id = _obj_id + 1
 				tracks.append(track)
+				tracks_KF.append(track)
+				tracks_conf.append(track_conf)
 				print track
 				track_KF = track
 				last_frame_idx = _frame_idx
@@ -243,6 +250,7 @@ def processMunkresKalman(points):
 				total = 0.
 				track_new = []
 				track_KF_new = []
+				track_conf_new = []
 				kalman_filters_new = []
 				rows = []
 				columns = []
@@ -258,27 +266,35 @@ def processMunkresKalman(points):
 					# track_new.append(track[row])
 				# for i in range(len(points[last_frame_idx])):
 
-				# if len(columns) > len(rows):
 				for i in range(len(frame)):
 					if i not in columns or cost_matrix[rows[columns.index(i)]][i] > COST_MAX_GATING:
 						# add new obj id for unassigned measurements
 						track_new.append(_obj_id)
 						kalman_filters_new.append(createKF(frame[i][0], frame[i][1]))
 						track_KF_new.append(_obj_id)
+						track_conf_new.append(frame[i][2])
 						_obj_id = _obj_id + 1
 					else:
-						# unassigned tracked ids die immediately
+						# unassigned tracked ids (Munkres) die immediately
 						track_new.append(track[rows[columns.index(i)]])
 						kalman_filters_new.append(kalman_filters[rows[columns.index(i)]])
 						track_KF_new.append(track[rows[columns.index(i)]])
+						track_conf_new.append(track_conf[rows[columns.index(i)]])
+
+				# # Maintain unassinged KF tracks
+				# if len(rows) < len(track_KF):
+					# # if len(columns) < len(rows):
+					# for kf_obji in track_KF:
 
 				kalman_filters = kalman_filters_new
 				track_KF = track_KF_new
-
 				track = track_new
-				print track
+				track_conf = track_conf_new
+
+				print track, track_KF, track_conf
 				tracks.append(track)
 				tracks_KF.append(track_KF)
+				tracks_conf.append(track_conf)
 
 				last_frame_idx = _frame_idx
 		_frame_idx = _frame_idx + 1
