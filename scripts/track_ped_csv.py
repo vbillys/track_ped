@@ -34,21 +34,27 @@ class AnimatedScatter(object):
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, s=128)
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.coolwarm, s=128)
 		self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.PuOr, s=128)
-		self.scat2 = self.ax.scatter(xkf, ykf, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
-		texts = []
-		_idx= 0
-		for ix,iy in zip(x, y):
-			text = self.ax.text(ix, iy + 0.3, str(obj_id[_idx]))
-			texts.append(text)
-			_idx = _idx + 1
-		_idx= 0
-		for ix,iy in zip(xkf, ykf):
-			text = self.ax.text(ix, iy + 0.3, str(obj_id[_idx]))
-			texts.append(text)
-			_idx = _idx + 1
+		if len(ct) > 0:
+			self.scat2 = self.ax.scatter(xkf, ykf, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
+			texts = []
+			# _idx= 0
+			# # for ix,iy in zip(x, y):
+			# for _ct in ct:
+				# text = self.ax.text(ix, iy + 0.3, str(obj_id[_idx]))
+				# texts.append(text)
+				# _idx = _idx + 1
+			_idx= 0
+			# for ix,iy in zip(xkf, ykf):
+			for _ct in ct:
+				ix , iy = xkf[_idx] , ykf[_idx]
+				text = self.ax.text(ix, iy + 0.3, str(obj_id[_idx]))
+				texts.append(text)
+				_idx = _idx + 1
+			clearables = [self.scat, self.scat2]
+			clearables = clearables + texts
+		else:
+			clearables = self.scat
 		self.ax.axis([0, 6, -5, 5])
-		clearables = [self.scat, self.scat2]
-		clearables = clearables + texts
 		# return self.scat, self.scat2
 		return clearables
 
@@ -56,30 +62,35 @@ class AnimatedScatter(object):
 		data = next(self.stream)
 		# self.scat.set_offsets(data[:2, :])
 		self.scat.set_offsets(np.column_stack((data[0], data[1])))
-		self.scat2.set_offsets(np.column_stack((data[5], data[6])))
 		# self.scat._sizes = 300 * abs(data[2])**1.5 + 100
 		# print np.array(data[2])
 		# self.scat.set_array(np.array(data[2]))
 		self.scat.set_color(data[2])
-		self.scat2.set_color(data[3])
-		texts = []
-		_idx= 0
-		for ix,iy in zip(data[0], data[1]):
-			text = self.ax.text(ix, iy + 0.3, str(data[4][_idx]))
-			texts.append(text)
-			_idx = _idx + 1
-		_idx= 0
-		for ix,iy in zip(data[5], data[6]):
-			text = self.ax.text(ix, iy + 0.3, str(data[4][_idx]))
-			texts.append(text)
-			_idx = _idx + 1
+		if len(data[3]) > 0:
+			self.scat2.set_color(data[3])
+			self.scat2.set_offsets(np.column_stack((data[5], data[6])))
+			texts = []
+			# _idx= 0
+			# for ix,iy in zip(data[0], data[1]):
+				# text = self.ax.text(ix, iy + 0.3, str(data[4][_idx]))
+				# texts.append(text)
+				# _idx = _idx + 1
+			_idx= 0
+			# for ix,iy in zip(data[5], data[6]):
+			for _ct in data[3]:
+				ix , iy = data[5][_idx] , data[6][_idx]
+				text = self.ax.text(ix, iy + 0.3, str(data[4][_idx]))
+				texts.append(text)
+				_idx = _idx + 1
 		# self.scat.set_color(np.array(data[2]))
 		# self.scat.set_facecolor(np.column_stack((data[2], data[2])))
 		# self.scat.set_array(np.matrix(data[2]))
 		# return self.scat, self.scat2
 		# return self.scat,
-		clearables = [self.scat, self.scat2]
-		clearables = clearables + texts
+			clearables = [self.scat, self.scat2]
+			clearables = clearables + texts
+		else:
+			clearables = self.scat
 		# return self.scat, self.scat2
 		return clearables
 
@@ -164,6 +175,14 @@ def animatePoints(data, tracks_munkres, max_obj_id, KF_points):
 				xs.append(_pp[0]) # = points_timed[-1][0] + _pp[0]
 				ys.append(_pp[1]) # = points_timed[-1][1] + _pp[1]
 				cs.append(colors[_i])
+				# colors_tracks[tracks_munkres[_idx][_i]]
+				# print _idx, len(tracks_munkres), len(tracks_munkres[_idx]), _i
+				# print tracks_munkres[_idx][_i]
+				# print len(colors_tracks), tracks_munkres[_idx][_i]
+
+				_i = _i + 1
+			_i = 0
+			for _pp in tracks_munkres[_idx]:
 				cst.append(colors_tracks[tracks_munkres[_idx][_i]])
 				xskf.append(KF_points[_idx][_i][0])
 				yskf.append(KF_points[_idx][_i][1])
@@ -207,7 +226,8 @@ def createKF(x,y):
 	return kalman_filter
 
 COST_MAX_GATING = 1.5
-DECAY_RATE = 0.8
+DECAY_RATE = 0.9
+DECAY_THRES = 0.5
 def processMunkresKalman(points):
 
 	kalman_filters = []
@@ -278,7 +298,7 @@ def processMunkresKalman(points):
 						cost_matrix[-1].append(_mdist)
 					_lidx = _lidx + 1
 				# print _frame_idx, cost_matrix
-				indexes = munkres.compute(cost_matrix)
+
 				total = 0.
 				track_new = []
 				track_KF_new = []
@@ -287,6 +307,11 @@ def processMunkresKalman(points):
 				kalman_filters_new = []
 				rows = []
 				columns = []
+				indexes = []
+
+				if _lidx > 0:
+					indexes = munkres.compute(cost_matrix)
+
 				for row, column in indexes:
 					# track_new.append(valid_ids[row])
 					value = cost_matrix[row][column]
@@ -300,8 +325,10 @@ def processMunkresKalman(points):
 				# for i in range(len(points[last_frame_idx])):
 
 				for i in range(len(frame)):
-					if i not in columns or cost_matrix[rows[columns.index(i)]][i] > COST_MAX_GATING:
+					if i not in columns: # or cost_matrix[rows[columns.index(i)]][i] > COST_MAX_GATING:
+					# if i not in columns or cost_matrix[rows[columns.index(i)]][i] > COST_MAX_GATING:
 						# add new obj id for unassigned measurements
+						print 'added new object'
 						track_new.append(_obj_id)
 						kalman_filters_new.append(createKF(frame[i][0], frame[i][1]))
 						track_KF_point_new.append([frame[i][0], frame[i][1]])
@@ -309,6 +336,9 @@ def processMunkresKalman(points):
 						track_conf_new.append(frame[i][2])
 						_obj_id = _obj_id + 1
 					else:
+						# print i, columns.index(i), rows[columns.index(i)], cost_matrix
+						if cost_matrix[rows[columns.index(i)]][i] > COST_MAX_GATING:
+							continue
 						# unassigned tracked ids (Munkres) die immediately
 						# compute for assigned tracks
 						track_new.append(track[rows[columns.index(i)]])
@@ -322,10 +352,19 @@ def processMunkresKalman(points):
 						track_conf_new.append(track_conf[rows[columns.index(i)]]*DECAY_RATE + frame[i][2]*(1-DECAY_RATE))
 
 				# # Maintain unassinged KF tracks
-				# if len(rows) < len(track_KF):
-					# # if len(columns) < len(rows):
-					# for kf_obji in track_KF:
-						# if kf_obji not in track_KF_new:
+				if len(rows) < len(track_KF):
+					# if len(columns) < len(rows):
+					for kf_obji in track_KF:
+						if kf_obji not in track_KF_new:
+							_index = track_KF.index(kf_obji)
+							_conf = track_conf[_index]*DECAY_RATE
+							if _conf > DECAY_THRES:
+								kalman_filters_new.append(kalman_filters[_index])
+								track_conf_new.append(_conf)
+								track_KF_point_new.append([track_KF_point[_index][0],track_KF_point[_index][1]])
+								track_new.append(kf_obji)
+								track_KF_new.append(kf_obji)
+
 
 				kalman_filters = kalman_filters_new
 				track_KF = track_KF_new
@@ -343,7 +382,7 @@ def processMunkresKalman(points):
 				last_frame_idx = _frame_idx
 		_frame_idx = _frame_idx + 1
 
-	# print tracks
+	print tracks
 	return tracks, _obj_id-1, tracks_KF_points
 	pass
 
