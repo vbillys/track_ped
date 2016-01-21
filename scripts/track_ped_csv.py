@@ -7,6 +7,7 @@ from filterpy.common import Q_discrete_white_noise, dot3
 # import book_format
 # import book_plots
 import math
+import time
 
 import numpy as np
 # from matplotlib.patches import Circle, Rectangle, Polygon, Arrow, FancyArrow
@@ -15,8 +16,8 @@ import pylab as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
 
-# f_handle = open('ped_data.csv','r')
-f_handle = open('ped_data_2.csv','r')
+f_handle = open('ped_data.csv','r')
+# f_handle = open('ped_data_2.csv','r')
 
 
 
@@ -430,7 +431,10 @@ for str_ in f_content:
 	points.append(point)
 # print points
 # tracks_munkres , max_obj_id = processMunkres(points)
+t_start = time.time()
 tracks_munkres , max_obj_id , tracks_KF_points= processMunkresKalman(points)
+t_end = time.time()
+print (-t_start + t_end) , len(points), (-t_start + t_end) / len(points)
 plotPoints(points)
 animatePoints(points, tracks_munkres, max_obj_id, tracks_KF_points)
 # plotPoints(points_processed)
