@@ -19,8 +19,8 @@ import matplotlib.animation as animation
 # f_handle = open('ped_data.csv','r')
 # f_handle = open('ped_data_2.csv','r')
 # f_handle = open('ped_data_3.csv','r')
-f_handle = open('ped_data_4.csv','r')
-# f_handle = open('ped_data_5.csv','r')
+# f_handle = open('ped_data_4.csv','r')
+f_handle = open('ped_data_5.csv','r')
 
 
 
@@ -34,12 +34,14 @@ class AnimatedScatter(object):
 		self.ani = animation.FuncAnimation(self.fig, self.update, interval=100, init_func=self.setup_plot, blit=True, frames=len(data)-1, repeat=False)
 
 	def setup_plot(self):
-		x, y, c, ct, obj_id, xkf, ykf = next(self.stream)
+		# x, y, c, ct, obj_id, xkf, ykf = next(self.stream)
+		x, y, c, ct, obj_id, xkf, ykf, twoleg_xs, twoleg_ys, oneleg_xs, oneleg_ys = next(self.stream)
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, s=128)
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.coolwarm, s=128)
 		self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.PuOr, s=128)
 		# self.ax.axis([0, 6, -5, 5])
 		self.ax.axis([0, 10, -10, 10])
+		self.ax.axis([0, 4, -10, 10])
 		if len(ct) > 0:
 			self.scat2 = self.ax.scatter(xkf, ykf, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
 			texts = []
@@ -58,6 +60,12 @@ class AnimatedScatter(object):
 				_idx = _idx + 1
 			clearables = [self.scat, self.scat2]
 			clearables = clearables + texts
+			# if len(twoleg_xs) > 0:
+			# self.scat3 = self.ax.scatter(twoleg_xs, twoleg_ys, c='black', animated=True, marker='^', s=100, linewidth=4)
+			self.scat3 = self.ax.scatter([], [], c='black', animated=True, marker='^', s=100, linewidth=4)
+			clearables = clearables + [self.scat3]
+			# for _xx, _yy in zip (twoleg_xs, twoleg_ys):
+				
 			return clearables
 		else:
 			clearables = self.scat
@@ -96,6 +104,11 @@ class AnimatedScatter(object):
 		# return self.scat,
 			clearables = [self.scat, self.scat2]
 			clearables = clearables + texts
+			if len(data[7]) > 0:
+				# self.scat3 = self.ax.scatter(data[8], data[9], c='black', animated=True, marker='O', linewidth=4)
+				# print len(data[7]), len(data[8])
+				self.scat3.set_offsets(np.column_stack((data[7], data[8])))
+				clearables = clearables + [self.scat3]
 			return clearables
 		else:
 			clearables = self.scat
@@ -149,7 +162,7 @@ def plotPoints(data):
 	# a = AnimatedScatter(points_tracked)
 	# plt.show()
 
-def animatePoints(data, tracks_munkres, max_obj_id, KF_points):
+def animatePoints(data, tracks_munkres, max_obj_id, KF_points, twolegs_tracks, onelegs_tracks):
 	maxlen = len(max(data,key=len))
 	print 'maxlen',maxlen
 	colors = cm.rainbow(np.linspace(0, 1, maxlen))
@@ -177,6 +190,10 @@ def animatePoints(data, tracks_munkres, max_obj_id, KF_points):
 			obj_id = []
 			xskf = []
 			yskf = []
+			twoleg_xs = []
+			twoleg_ys = []
+			oneleg_xs = []
+			oneleg_ys = []
 			_i = 0
 			for _pp in frame:
 				# points_timed[-1][0].append(_pp[0]) # = points_timed[-1][0] + _pp[0]
@@ -198,7 +215,14 @@ def animatePoints(data, tracks_munkres, max_obj_id, KF_points):
 				yskf.append(KF_points[_idx][_i][1])
 				obj_id.append(tracks_munkres[_idx][_i])
 				_i = _i + 1
-			points_timed[-1] = (xs, ys, cs, cst, obj_id, xskf, yskf)
+
+			for _pp in twolegs_tracks[_idx]:
+				# print _pp
+				twoleg_xs.append(_pp[6])
+				twoleg_ys.append(_pp[7])
+
+			# points_timed[-1] = (xs, ys, cs, cst, obj_id, xskf, yskf)
+			points_timed[-1] = (xs, ys, cs, cst, obj_id, xskf, yskf, twoleg_xs, twoleg_ys, oneleg_xs, oneleg_ys)
 			# tracks_timed[-1] = (xs, ys, cst)
 			_idx = _idx + 1
 
@@ -252,10 +276,10 @@ def squareMatrix(mat, fillconstant):
 
 	return newmat
 
-COST_MAX_GATING = .7 #1.5
+COST_MAX_GATING = .8 #1.5 #.7 #1.5 #.7 #1.5
 DECAY_RATE = 0.93
 DECAY_THRES = 0.3
-RMAHALANOBIS = 2.
+RMAHALANOBIS = 2. #.5 #2.5 #2.5
 def processMunkresKalman(points):
 
 	kalman_filters = []
@@ -428,6 +452,87 @@ def processMunkresKalman(points):
 	return tracks, _obj_id-1, tracks_KF_points
 	pass
 
+PERSON_GATING_DISTANCE = 0.8
+def findPeopleTracks(leg_tracks):
+	# people_tracks = []
+	twolegs_tracks = []
+	onelegs_tracks = []
+	for track in leg_tracks:
+		if len(track) > 1:
+			leg_dists = []
+			for leg in track:
+				leg_dist = []
+				leg_index = []
+				t_min_dist = 9999.
+				t_min_index = 1
+				# uniqueness = np.zeros(len(track))
+				uniqueness = [0]*(len(track))
+
+				for oleg in track:
+					if track.index(oleg) != track.index(leg):
+						_dd = math.hypot(leg[0]-oleg[0],leg[1]-oleg[1])
+						if _dd <= PERSON_GATING_DISTANCE:
+							leg_dist.append(_dd)
+							leg_index.append(track.index(oleg))
+							if t_min_dist> _dd:
+								t_min_index = track.index(oleg)
+								t_min_dist = _dd
+
+				if leg_index:
+					uniqueness[t_min_index] = uniqueness[t_min_index] + 1
+					uniqueness[track.index(leg)] = uniqueness[track.index(leg)] + 1
+					leg_dists.append([leg_dist, leg_index, t_min_index])
+				else:
+					leg_dists.append([leg_dist, leg_index, -1])
+			if max(uniqueness) > 1:
+				print 'solving conflicting legs... (WARN: For NOW REMOVED!!!)'
+			# print uniqueness
+			# print leg_dists
+			twolegs_track = []
+			onelegs_track = []
+			t_index = 0
+			for uni in uniqueness:
+				# t_index = uniqueness.index(uni)
+				# print t_index, uni
+				if uni == 1:
+					# print leg_dists
+					t_index2 = leg_dists[t_index][2]#[t_index ]
+					# twolegs_tracks.append([leg_dists[-1][2][t_index ],t_index ])
+					if uniqueness[t_index2] is not None:
+						_x_index = track[t_index][0]
+						_y_index = track[t_index][1]
+						_x_index2= track[t_index2][0]
+						_y_index2= track[t_index2][1]
+						twolegs_track.append([t_index2,t_index , _x_index, _y_index, _x_index2, _y_index2, (_x_index + _x_index2)/2, (_y_index + _y_index2)/2])
+						uniqueness[t_index] = None
+						uniqueness[t_index2] = None
+					else:
+						uniqueness[t_index] = None
+						# removing already added (conflicting found later)
+						for _twoleg in twolegs_track:
+							# if _twoleg[0] == t_index or _twoleg[0] == t_index2 or _twoleg[1] == t_index or _twoleg[1] == t_index2:
+							if _twoleg[0] == t_index or _twoleg[1] == t_index:
+								twolegs_track.pop(twolegs_track.index(_twoleg))
+				else:
+					if uni is not None:
+						onelegs_track.append([t_index, track[t_index][0], track[t_index][1]])
+				t_index = t_index + 1
+			# print uniqueness
+			# print onelegs_track
+			twolegs_tracks.append(twolegs_track)
+			onelegs_tracks.append(onelegs_track)
+
+		else:
+			# no pairing possible
+			# people_tracks.append([])
+			twolegs_tracks.append([])
+			onelegs_tracks.append([0])
+	# print twolegs_tracks
+	# print onelegs_tracks
+	return twolegs_tracks, onelegs_tracks
+
+
+
 def grouper(n, iterable, fillvalue=None):
 	"grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
 	args = [iter(iterable)] * n
@@ -448,10 +553,11 @@ for str_ in f_content:
 # tracks_munkres , max_obj_id = processMunkres(points)
 t_start = time.time()
 tracks_munkres , max_obj_id , tracks_KF_points= processMunkresKalman(points)
+people_2legs_tracks, people_1leg_tracks = findPeopleTracks(tracks_KF_points)
 t_end = time.time()
 print (-t_start + t_end) , len(points), (-t_start + t_end) / len(points)
 plotPoints(points)
-animatePoints(points, tracks_munkres, max_obj_id, tracks_KF_points)
+animatePoints(points, tracks_munkres, max_obj_id, tracks_KF_points, people_2legs_tracks, people_1leg_tracks)
 # plotPoints(points_processed)
 # animatePoints(points_processed)
 
