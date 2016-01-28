@@ -16,11 +16,11 @@ import pylab as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
 
-f_handle = open('ped_data.csv','r')
+# f_handle = open('ped_data.csv','r')
 # f_handle = open('ped_data_2.csv','r')
 # f_handle = open('ped_data_3.csv','r')
 # f_handle = open('ped_data_4.csv','r')
-# f_handle = open('ped_data_5.csv','r')
+f_handle = open('ped_data_5.csv','r')
 
 
 
@@ -227,7 +227,7 @@ def animatePoints(data, tracks_munkres, max_obj_id, KF_points, twolegs_tracks, o
 				twoleg_ys.append(_pp[7])
 			for _pp in onelegs_tracks[_idx]:
 				# if _pp:
-				print _pp
+				# print _pp
 				oneleg_xs.append(_pp[1])
 				oneleg_ys.append(_pp[2])
 
@@ -251,13 +251,13 @@ def createKF(x,y):
 		[0 , 1., 0 ,  0],
 		[0 , 0 , 1., dt],
 		[0 , 0 , 0 , 1.]])
-	KF_q = 0.3
+	KF_q = 0.7 #0.3
 	KF_Q = np.vstack((np.hstack((Q_discrete_white_noise(2, dt=0.1, var=KF_q),np.zeros((2,2)))),np.hstack((np.zeros((2,2)),Q_discrete_white_noise(2, dt=0.1, var=KF_q)))))
 	KF_pd = 25.
 	KF_pv = 10.
 	KF_P = np.diag([KF_pd, KF_pv,KF_pd, KF_pv])
 	KF_rd = 0.05
-	KF_rv = 0.5
+	KF_rv = 0.2 #0.5
 	# KF_R = np.diag([KF_rd,KF_rd])
 	KF_R = np.diag([KF_rd,KF_rd, KF_rv, KF_rv])
 	# KF_H = np.array([[1.,0,0,0],[0,0,1.,0]])
@@ -523,11 +523,18 @@ def findPeopleTracks(leg_tracks):
 						uniqueness[t_index2] = None
 					else:
 						uniqueness[t_index] = None
+						onelegs_track.append([t_index, track[t_index][0], track[t_index][1]])
 						# removing already added (conflicting found later)
+						tt_idx = 0
 						for _twoleg in twolegs_track:
 							# if _twoleg[0] == t_index or _twoleg[0] == t_index2 or _twoleg[1] == t_index or _twoleg[1] == t_index2:
-							if _twoleg[0] == t_index or _twoleg[1] == t_index:
+							if _twoleg[0] == t_index:
 								twolegs_track.pop(twolegs_track.index(_twoleg))
+								onelegs_track.append([_twoleg[1], track[_twoleg[1]][0], track[_twoleg[1]][1]])
+							if _twoleg[1] == t_index:
+								twolegs_track.pop(twolegs_track.index(_twoleg))
+								onelegs_track.append([_twoleg[0], track[_twoleg[0]][0], track[_twoleg[0]][1]])
+							tt_idx = tt_idx + 1
 				else:
 					if uni is not None:
 						onelegs_track.append([t_index, track[t_index][0], track[t_index][1]])
@@ -542,8 +549,8 @@ def findPeopleTracks(leg_tracks):
 			# people_tracks.append([])
 			twolegs_tracks.append([])
 			onelegs_tracks.append([[0, track[0][0], track[0][1]]])
-	print twolegs_tracks
-	print onelegs_tracks
+	# print twolegs_tracks
+	# print onelegs_tracks
 	return twolegs_tracks, onelegs_tracks
 
 
