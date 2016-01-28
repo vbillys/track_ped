@@ -63,7 +63,8 @@ class AnimatedScatter(object):
 			# if len(twoleg_xs) > 0:
 			# self.scat3 = self.ax.scatter(twoleg_xs, twoleg_ys, c='black', animated=True, marker='^', s=100, linewidth=4)
 			self.scat3 = self.ax.scatter([], [], c='black', animated=True, marker='^', s=100, linewidth=4)
-			clearables = clearables + [self.scat3]
+			self.scat4 = self.ax.scatter([], [], c='yellow', animated=True, marker='d', s=60, linewidth=3)
+			clearables = clearables + [self.scat3, self.scat4]
 			# for _xx, _yy in zip (twoleg_xs, twoleg_ys):
 				
 			return clearables
@@ -109,6 +110,9 @@ class AnimatedScatter(object):
 				# print len(data[7]), len(data[8])
 				self.scat3.set_offsets(np.column_stack((data[7], data[8])))
 				clearables = clearables + [self.scat3]
+			if len(data[9]) > 0:
+				self.scat4.set_offsets(np.column_stack((data[9], data[10])))
+				clearables = clearables + [self.scat4]
 			return clearables
 		else:
 			clearables = self.scat
@@ -163,6 +167,7 @@ def plotPoints(data):
 	# plt.show()
 
 def animatePoints(data, tracks_munkres, max_obj_id, KF_points, twolegs_tracks, onelegs_tracks):
+	# print onelegs_tracks
 	maxlen = len(max(data,key=len))
 	print 'maxlen',maxlen
 	colors = cm.rainbow(np.linspace(0, 1, maxlen))
@@ -220,6 +225,11 @@ def animatePoints(data, tracks_munkres, max_obj_id, KF_points, twolegs_tracks, o
 				# print _pp
 				twoleg_xs.append(_pp[6])
 				twoleg_ys.append(_pp[7])
+			for _pp in onelegs_tracks[_idx]:
+				# if _pp:
+				print _pp
+				oneleg_xs.append(_pp[1])
+				oneleg_ys.append(_pp[2])
 
 			# points_timed[-1] = (xs, ys, cs, cst, obj_id, xskf, yskf)
 			points_timed[-1] = (xs, ys, cs, cst, obj_id, xskf, yskf, twoleg_xs, twoleg_ys, oneleg_xs, oneleg_ys)
@@ -480,19 +490,19 @@ def findPeopleTracks(leg_tracks):
 
 				# print leg_index
 				if leg_index:
-					print uniqueness
+					# print uniqueness
 					uniqueness[t_min_index] = uniqueness[t_min_index] + 1
 					uniqueness[track.index(leg)] = uniqueness[track.index(leg)] + 1
 					leg_dists.append([leg_dist, leg_index, t_min_index])
-					print 'got potential pair', t_min_index, track.index(leg)
+					# print 'got potential pair', t_min_index, track.index(leg)
 
-					print uniqueness
+					# print uniqueness
 				else:
 					leg_dists.append([leg_dist, leg_index, -1])
-			if max(uniqueness) > 1:
-				print 'solving conflicting legs... (WARN: For NOW REMOVED!!!)'
-			print uniqueness
-			print leg_dists
+			# if max(uniqueness) > 1:
+				# print 'solving conflicting legs... (WARN: For NOW REMOVED!!!)'
+			# print uniqueness
+			# print leg_dists
 			twolegs_track = []
 			onelegs_track = []
 			t_index = 0
@@ -531,9 +541,9 @@ def findPeopleTracks(leg_tracks):
 			# no pairing possible
 			# people_tracks.append([])
 			twolegs_tracks.append([])
-			onelegs_tracks.append([0])
-	# print twolegs_tracks
-	# print onelegs_tracks
+			onelegs_tracks.append([[0, track[0][0], track[0][1]]])
+	print twolegs_tracks
+	print onelegs_tracks
 	return twolegs_tracks, onelegs_tracks
 
 
