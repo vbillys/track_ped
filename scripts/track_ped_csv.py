@@ -16,11 +16,11 @@ import pylab as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
 
-# f_handle = open('ped_data.csv','r')
+f_handle = open('ped_data.csv','r')
 # f_handle = open('ped_data_2.csv','r')
 # f_handle = open('ped_data_3.csv','r')
 # f_handle = open('ped_data_4.csv','r')
-f_handle = open('ped_data_5.csv','r')
+# f_handle = open('ped_data_5.csv','r')
 
 
 
@@ -460,13 +460,13 @@ def findPeopleTracks(leg_tracks):
 	for track in leg_tracks:
 		if len(track) > 1:
 			leg_dists = []
+			uniqueness = [0]*(len(track))
 			for leg in track:
 				leg_dist = []
 				leg_index = []
 				t_min_dist = 9999.
 				t_min_index = 1
 				# uniqueness = np.zeros(len(track))
-				uniqueness = [0]*(len(track))
 
 				for oleg in track:
 					if track.index(oleg) != track.index(leg):
@@ -478,27 +478,32 @@ def findPeopleTracks(leg_tracks):
 								t_min_index = track.index(oleg)
 								t_min_dist = _dd
 
+				# print leg_index
 				if leg_index:
+					print uniqueness
 					uniqueness[t_min_index] = uniqueness[t_min_index] + 1
 					uniqueness[track.index(leg)] = uniqueness[track.index(leg)] + 1
 					leg_dists.append([leg_dist, leg_index, t_min_index])
+					print 'got potential pair', t_min_index, track.index(leg)
+
+					print uniqueness
 				else:
 					leg_dists.append([leg_dist, leg_index, -1])
 			if max(uniqueness) > 1:
 				print 'solving conflicting legs... (WARN: For NOW REMOVED!!!)'
-			# print uniqueness
-			# print leg_dists
+			print uniqueness
+			print leg_dists
 			twolegs_track = []
 			onelegs_track = []
 			t_index = 0
 			for uni in uniqueness:
 				# t_index = uniqueness.index(uni)
 				# print t_index, uni
-				if uni == 1:
+				if uni == 2:
 					# print leg_dists
 					t_index2 = leg_dists[t_index][2]#[t_index ]
 					# twolegs_tracks.append([leg_dists[-1][2][t_index ],t_index ])
-					if uniqueness[t_index2] is not None:
+					if uniqueness[t_index2] is not None and t_index2 >= 0:
 						_x_index = track[t_index][0]
 						_y_index = track[t_index][1]
 						_x_index2= track[t_index2][0]
