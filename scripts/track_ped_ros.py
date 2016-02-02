@@ -7,7 +7,10 @@ from scipy.spatial.distance import mahalanobis
 import math
 import time
 import numpy as np
+import matplotlib
+matplotlib.use('GTKAgg')
 import pylab as plt
+# import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
 
@@ -20,7 +23,7 @@ DECAY_THRES = 0.3
 RMAHALANOBIS = 2. #.5 #2.5 #2.5
 
 class PeopleTrackerFromLegs:
-	def __init__(self):
+	def __init__(self, display):
 		self.kalman_filters_leg = []
 		self._first_leg = False
 		# self.tracks_leg = []
@@ -33,6 +36,7 @@ class PeopleTrackerFromLegs:
 		self.track_KF_point_leg = []
 		# _frame_idx = 0
 		self._obj_id = 1
+		self.display = display
 
 	def processMunkresKalman(self,points):
 
@@ -53,6 +57,7 @@ class PeopleTrackerFromLegs:
 					# self.track_KF_point_leg.append([leg[0],leg[1]])
 					self.track_KF_point_leg.append([leg[0],leg[1],0 ,0])
 					self._obj_id = self._obj_id + 1
+				self.display.setup_plot(frame, self.track_KF_point_leg)
 				# tracks.append(track)
 				# tracks_KF.append(track)
 				# tracks_conf.append(track_conf)
@@ -197,6 +202,8 @@ class PeopleTrackerFromLegs:
 				# tracks_KF_points.append(track_KF_point)
 
 				# last_frame_idx = _frame_idx
+
+				self.display.update(frame, self.track_KF_point_leg)
 		else:
 			# print 'Skipping frame %d, empty data, may not real time' % (_frame_idx)
 			print 'Skipping frame ..., empty data, may not real time'
@@ -208,7 +215,52 @@ class PeopleTrackerFromLegs:
 	pass
 
 
-people_tracker = PeopleTrackerFromLegs()
+def aggreateCoord(data):
+	xs, ys = [], []
+	for leg in data:
+		xs.append(leg[0])
+		ys.append(leg[1])
+	return xs, ys
+
+# class AnimatedScatter(object):
+class AnimatedScatter:
+	def __init__(self):
+		self.fig, self.ax = plt.subplots()
+		self.ax.axis([0, 4, -10, 10])
+		self.ax.hold(True)
+		# plt.axis([0, 4, -10, 10])
+		plt.ion()
+		self.fig.canvas.draw()
+		plt.show(False)
+		# plt.draw()
+		# self.setup_plot()
+		# self.scat2 =  None
+		self.scat = self.ax.scatter([], [], c='blue', cmap=plt.cm.PuOr, s=128)
+		self.scat2 = self.ax.scatter([], [], c='red', cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
+
+	def setup_plot(self, data, data_kf):
+		xs, ys = aggreateCoord(data)
+		xskf, yskf = aggreateCoord(data_kf)
+		# self.scat = self.ax.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
+		self.scat.set_offsets(np.column_stack((xs, ys)))
+		self.scat2.set_offsets(np.column_stack((xskf, yskf)))
+		# self.scat2 = self.ax.scatter(xkf, ykf, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
+		# plt.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
+		self.fig.canvas.draw()
+		plt.draw()
+
+	def update(self,data, data_kf):
+		xs, ys = aggreateCoord(data)
+		xskf, yskf = aggreateCoord(data_kf)
+		# plt.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
+		self.scat.set_offsets(np.column_stack((xs, ys)))
+		self.scat2.set_offsets(np.column_stack((xskf, yskf)))
+		# self.scat.set_color(data[2])
+		self.fig.canvas.draw()
+		plt.draw()
+
+display_tracker= AnimatedScatter()
+people_tracker = PeopleTrackerFromLegs(display_tracker)
 def processLegArray(msg):
 	# print msg
 	points = []
