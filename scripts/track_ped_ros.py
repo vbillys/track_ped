@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import rospy
-from mech_input.msg import LegMeasurementArray, LegMeasurement #, PersonTrack, PersonTrackArray
+from mech_input.msg import LegMeasurementArray, LegMeasurement , PersonTrack, PersonTrackArray
 
 from munkres import Munkres
 from scipy.spatial.distance import mahalanobis
@@ -16,6 +16,7 @@ import matplotlib.animation as animation
 
 from CustomCreateKF import createLegKF, createPersonKF, squareMatrix
 
+g_pub_ppl = None
 
 COST_MAX_GATING = .8 #1.5 #.7 #1.5 #.7 #1.5
 DECAY_RATE = 0.93
@@ -24,7 +25,7 @@ RMAHALANOBIS = 2. #.5 #2.5 #2.5
 PERSON_GATING_DISTANCE = 0.8
 
 class PeopleTrackerFromLegs:
-	def __init__(self, display):
+	def __init__(self, display, pub_persons):
 		self.munkres = Munkres()
 		self.kalman_filters_leg = []
 		self._first_leg = False
@@ -46,6 +47,9 @@ class PeopleTrackerFromLegs:
 		self.track_conf_people = []
 		self.track_KF_point_people = []
 		self._people_id = 1
+
+		self.pub_persons = pub_persons
+
 
 	def processMunkresKalman(self,points):
 
@@ -215,6 +219,7 @@ class PeopleTrackerFromLegs:
 				# self.display.update(frame, self.track_KF_point_leg)
 			self.findPeopleTracks()
 			self.processMunkresKalmanPeople()
+			self.publishPersons()
 			if not self._first_leg:
 				self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people)
 			else:
@@ -448,6 +453,24 @@ class PeopleTrackerFromLegs:
 
 	# return tracks_KF, _person_id-1, tracks_KF_points, tracks_conf
 
+	def publishPersons(self):
+		persons = PersonTrackArray()
+		persons.header.stamp = rospy.Time.now()
+		persons.no_of_persons = len(self.track_KF_people)
+		if persons.no_of_persons > 0:
+			_idx = 0
+			for conf in self.track_conf_people:
+				person = PersonTrack()
+				person.header.stamp = rospy.Time.now()
+				person.ConPerson = conf
+				person.xPerson = self.track_KF_point_people[_idx][0]
+				person.yPerson = self.track_KF_point_people[_idx][1]
+				person.object_id = self.track_KF_people[_idx]
+				persons.Persons.append(person)
+
+				_idx = _idx + 1
+		self.pub_persons.publish(persons)
+
 def aggreateCoord(data):
 	xs, ys = [], []
 	for leg in data:
@@ -516,8 +539,10 @@ class AnimatedScatter:
 		self.fig.canvas.draw()
 		# plt.draw()
 
-display_tracker= AnimatedScatter()
-people_tracker = PeopleTrackerFromLegs(display_tracker)
+# display_tracker= AnimatedScatter()
+# people_tracker = PeopleTrackerFromLegs(display_tracker)
+display_tracker = None
+people_tracker = None
 def processLegArray(msg):
 	# print msg
 	tic = time.time()
@@ -534,9 +559,13 @@ def processLegArray(msg):
 
 
 def talker():
+	global g_pub_ppl, display_tracker, people_tracker
 	rospy.init_node('track_ped', anonymous=False)
 	# rospy.Subscriber('/usb_cam/image_raw', Image, filter_points)
 	rospy.Subscriber('/legs', LegMeasurementArray, processLegArray)
+	g_pub_ppl = rospy.Publisher('/persons', PersonTrackArray, queue_size = 10)
+	display_tracker= AnimatedScatter()
+	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl)
 	rospy.spin()
 	pass
 
