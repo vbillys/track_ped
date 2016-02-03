@@ -1,0 +1,6 @@
+<launch>
+  
+  <node pkg="track_ped" type="track_ped_ros.py" name="people_leg_tracker" output="screen">
+  </node>
+
+</launch>
