@@ -21,6 +21,7 @@ COST_MAX_GATING = .8 #1.5 #.7 #1.5 #.7 #1.5
 DECAY_RATE = 0.93
 DECAY_THRES = 0.3
 RMAHALANOBIS = 2. #.5 #2.5 #2.5
+PERSON_GATING_DISTANCE = 0.8
 
 class PeopleTrackerFromLegs:
 	def __init__(self, display):
@@ -204,6 +205,7 @@ class PeopleTrackerFromLegs:
 				# last_frame_idx = _frame_idx
 
 				self.display.update(frame, self.track_KF_point_leg)
+			self.findPeopleTracks()
 		else:
 			# print 'Skipping frame %d, empty data, may not real time' % (_frame_idx)
 			print 'Skipping frame ..., empty data, may not real time'
@@ -213,6 +215,105 @@ class PeopleTrackerFromLegs:
 		# print tracks
 		# return tracks, _obj_id-1, tracks_KF_points, tracks_conf
 	pass
+
+	def findPeopleTracks(self): #, leg_confs):
+		# people_tracks = []
+		# twolegs_tracks = []
+		# onelegs_tracks = []
+		track = self.track_KF_point_leg
+		conf  = self.track_conf_leg
+		# for track, conf in zip (leg_tracks, leg_confs):
+		if len(track) > 1:
+			leg_dists = []
+			uniqueness = [0]*(len(track))
+			for leg in track:
+				leg_dist = []
+				leg_index = []
+				t_min_dist = 9999.
+				t_min_index = 1
+				# uniqueness = np.zeros(len(track))
+
+				for oleg in track:
+					if track.index(oleg) != track.index(leg):
+						_dd = math.hypot(leg[0]-oleg[0],leg[1]-oleg[1])
+						if _dd <= PERSON_GATING_DISTANCE:
+							leg_dist.append(_dd)
+							leg_index.append(track.index(oleg))
+							if t_min_dist> _dd:
+								t_min_index = track.index(oleg)
+								t_min_dist = _dd
+
+				# print leg_index
+				if leg_index:
+					# print uniqueness
+					uniqueness[t_min_index] = uniqueness[t_min_index] + 1
+					uniqueness[track.index(leg)] = uniqueness[track.index(leg)] + 1
+					leg_dists.append([leg_dist, leg_index, t_min_index])
+					# print 'got potential pair', t_min_index, track.index(leg)
+
+					# print uniqueness
+				else:
+					leg_dists.append([leg_dist, leg_index, -1])
+			# if max(uniqueness) > 1:
+				# print 'solving conflicting legs... (WARN: For NOW REMOVED!!!)'
+			# print uniqueness
+			# print leg_dists
+			twolegs_track = []
+			onelegs_track = []
+			t_index = 0
+			for uni in uniqueness:
+				# t_index = uniqueness.index(uni)
+				# print t_index, uni
+				if uni == 2:
+					# print leg_dists
+					t_index2 = leg_dists[t_index][2]#[t_index ]
+					# twolegs_tracks.append([leg_dists[-1][2][t_index ],t_index ])
+					if uniqueness[t_index2] is not None and t_index2 >= 0:
+						_x_index = track[t_index][0]
+						_y_index = track[t_index][1]
+						_x_index2= track[t_index2][0]
+						_y_index2= track[t_index2][1]
+						_conf = ( conf[t_index] + conf[t_index2] ) /2
+						twolegs_track.append([t_index2,t_index , _x_index, _y_index, _x_index2, _y_index2, (_x_index + _x_index2)/2, (_y_index + _y_index2)/2, _conf])
+						uniqueness[t_index] = None
+						uniqueness[t_index2] = None
+					else:
+						uniqueness[t_index] = None
+						onelegs_track.append([t_index, track[t_index][0], track[t_index][1], conf[t_index]])
+						# removing already added (conflicting found later)
+						tt_idx = 0
+						for _twoleg in twolegs_track:
+							# if _twoleg[0] == t_index or _twoleg[0] == t_index2 or _twoleg[1] == t_index or _twoleg[1] == t_index2:
+							if _twoleg[0] == t_index:
+								twolegs_track.pop(twolegs_track.index(_twoleg))
+								onelegs_track.append([_twoleg[1], track[_twoleg[1]][0], track[_twoleg[1]][1], conf[_twoleg[1]]])
+							if _twoleg[1] == t_index:
+								twolegs_track.pop(twolegs_track.index(_twoleg))
+								onelegs_track.append([_twoleg[0], track[_twoleg[0]][0], track[_twoleg[0]][1], conf[_twoleg[0]]])
+							tt_idx = tt_idx + 1
+				else:
+					if uni is not None:
+						onelegs_track.append([t_index, track[t_index][0], track[t_index][1], conf[t_index]])
+				t_index = t_index + 1
+			# print uniqueness
+			# print onelegs_track
+
+			# twolegs_tracks.append(twolegs_track)
+			# onelegs_tracks.append(onelegs_track)
+			self.twolegs_track = twolegs_track
+			self.onelegs_track = onelegs_track
+
+		else:
+			# no pairing possible
+			# people_tracks.append([])
+
+			# twolegs_tracks.append([])
+			self.twolegs_track = []
+			# onelegs_tracks.append([[0, track[0][0], track[0][1]]])
+			self.onelegs_track = [[0, track[0][0], track[0][1]]]
+		print self.twolegs_track
+		print self.onelegs_track
+		# return twolegs_tracks, onelegs_tracks
 
 
 def aggreateCoord(data):
@@ -270,6 +371,7 @@ def processLegArray(msg):
 			continue
 		points.append([l.xLeg, l.yLeg, l.ConLeg])
 	people_tracker.processMunkresKalman(points)
+	# people_tracker.findPeopleTracks()
 
 
 def talker():
