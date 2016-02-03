@@ -66,7 +66,7 @@ class PeopleTrackerFromLegs:
 					# self.track_KF_point_leg.append([leg[0],leg[1]])
 					self.track_KF_point_leg.append([leg[0],leg[1],0 ,0])
 					self._obj_id = self._obj_id + 1
-				self.display.setup_plot(frame, self.track_KF_point_leg)
+				# self.display.setup_plot(frame, self.track_KF_point_leg)
 				# tracks.append(track)
 				# tracks_KF.append(track)
 				# tracks_conf.append(track_conf)
@@ -212,9 +212,13 @@ class PeopleTrackerFromLegs:
 
 				# last_frame_idx = _frame_idx
 
-				self.display.update(frame, self.track_KF_point_leg)
+				# self.display.update(frame, self.track_KF_point_leg)
 			self.findPeopleTracks()
 			self.processMunkresKalmanPeople()
+			if not self._first_leg:
+				self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people)
+			else:
+				self.display.update(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people)
 		else:
 			# print 'Skipping frame %d, empty data, may not real time' % (_frame_idx)
 			print 'Skipping frame ..., empty data, may not real time'
@@ -451,6 +455,15 @@ def aggreateCoord(data):
 		ys.append(leg[1])
 	return xs, ys
 
+def createIds(xx, yy, ids, ax):
+	index = 0
+	texts = []
+	for _id in ids:
+		text = ax.text(xx[index], yy[index] + 0.3, str(_id))
+		texts.append(text)
+		index = index + 1
+	return texts
+
 # class AnimatedScatter(object):
 class AnimatedScatter:
 	def __init__(self):
@@ -466,27 +479,42 @@ class AnimatedScatter:
 		# self.scat2 =  None
 		self.scat = self.ax.scatter([], [], c='blue', cmap=plt.cm.PuOr, s=128)
 		self.scat2 = self.ax.scatter([], [], c='red', cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
+		self.scat3 = self.ax.scatter([], [], c='black', marker='^', s=100, linewidth=4)
+		self.texts = []
 
-	def setup_plot(self, data, data_kf):
+	def removeTexts(self):
+		for text in self.texts:
+			text.remove()
+		self.texts = []
+
+	def setup_plot(self, data, data_kf, data_pp_ppl, data_kf_ppl):
 		xs, ys = aggreateCoord(data)
 		xskf, yskf = aggreateCoord(data_kf)
+		xskfppl , yskfppl = aggreateCoord(data_pp_ppl)
+		self.removeTexts()
+		self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, self.ax)
 		# self.scat = self.ax.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
 		self.scat.set_offsets(np.column_stack((xs, ys)))
 		self.scat2.set_offsets(np.column_stack((xskf, yskf)))
+		self.scat3.set_offsets(np.column_stack((xskfppl, yskfppl)))
 		# self.scat2 = self.ax.scatter(xkf, ykf, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
 		# plt.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
 		self.fig.canvas.draw()
-		plt.draw()
+		# plt.draw()
 
-	def update(self,data, data_kf):
+	def update(self,data, data_kf, data_pp_ppl, data_kf_ppl):
 		xs, ys = aggreateCoord(data)
 		xskf, yskf = aggreateCoord(data_kf)
+		xskfppl , yskfppl = aggreateCoord(data_pp_ppl)
+		self.removeTexts()
+		self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, self.ax)
 		# plt.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
 		self.scat.set_offsets(np.column_stack((xs, ys)))
 		self.scat2.set_offsets(np.column_stack((xskf, yskf)))
+		self.scat3.set_offsets(np.column_stack((xskfppl, yskfppl)))
 		# self.scat.set_color(data[2])
 		self.fig.canvas.draw()
-		plt.draw()
+		# plt.draw()
 
 display_tracker= AnimatedScatter()
 people_tracker = PeopleTrackerFromLegs(display_tracker)
