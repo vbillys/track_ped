@@ -25,6 +25,7 @@ PERSON_GATING_DISTANCE = 0.8
 
 class PeopleTrackerFromLegs:
 	def __init__(self, display):
+		self.munkres = Munkres()
 		self.kalman_filters_leg = []
 		self._first_leg = False
 		# self.tracks_leg = []
@@ -39,11 +40,18 @@ class PeopleTrackerFromLegs:
 		self._obj_id = 1
 		self.display = display
 
+		self._first_people = False
+		self.kalman_filters_people = []
+		self.track_KF_people = []
+		self.track_conf_people = []
+		self.track_KF_point_people = []
+		self._people_id = 1
+
 	def processMunkresKalman(self,points):
 
 		# for frame in points:
 		frame = points
-		munkres = Munkres()
+		# munkres = Munkres()
 		# print frame
 		if len(frame)>0:
 			if not self._first_leg:
@@ -125,7 +133,7 @@ class PeopleTrackerFromLegs:
 				if _lidx > 0:
 					cost_matrix = squareMatrix(cost_matrix, COST_MAX_GATING)
 					# print cost_matrix
-					indexes = munkres.compute(cost_matrix)
+					indexes = self.munkres.compute(cost_matrix)
 
 				for row, column in indexes:
 					# track_new.append(valid_ids[row])
@@ -206,6 +214,7 @@ class PeopleTrackerFromLegs:
 
 				self.display.update(frame, self.track_KF_point_leg)
 			self.findPeopleTracks()
+			self.processMunkresKalmanPeople()
 		else:
 			# print 'Skipping frame %d, empty data, may not real time' % (_frame_idx)
 			print 'Skipping frame ..., empty data, may not real time'
@@ -315,6 +324,125 @@ class PeopleTrackerFromLegs:
 		print self.onelegs_track
 		# return twolegs_tracks, onelegs_tracks
 
+	def processMunkresKalmanPeople(self):
+		# kalman_filters = []
+		# tracks_KF = []
+		# tracks_conf = []
+		# tracks_KF_points = []
+		# _frame_idx = 0
+		# createPersonKF(0,0)
+
+		twolegs_track = self.twolegs_track
+		onelegs_track = self.onelegs_track
+		# for twolegs_track, onelegs_track in zip (twolegs_tracks, onelegs_tracks):
+		if not self._first_people:
+			# _first = True
+			track_KF = []
+			track_conf = []
+			track_KF_point = []
+			# _person_id = 1
+			if len(twolegs_track) > 0:
+				self._first_people = True
+				for twoleg in twolegs_track:
+					track_KF.append(self._people_id)
+					self.kalman_filters_people.append(createPersonKF(twoleg[6], twoleg[7]))
+					track_conf.append(twoleg[8])
+					track_KF_point.append([twoleg[6], twoleg[7]])
+					self._people_id = self._people_id + 1
+
+			# else:
+			# tracks_KF.append(track_KF)
+			# tracks_conf.append(track_conf)
+			# tracks_KF_points.append(track_KF_point)
+			self.track_KF_people = track_KF
+			self.track_conf_people = track_conf
+			self.track_KF_point_people = track_KF_point
+
+		else:
+			track_KF_point_new = []
+			for kf in self.kalman_filters_people:
+				kf.predict()
+				_x_updated = kf.x
+				track_KF_point_new.append([_x_updated[0], _x_updated[3]])
+			track_KF_point = track_KF_point_new
+			cost_matrix = []
+			_lidx = 0
+
+			# Here we need to prioritize twolegs from onelegs.
+			# If any twolegs found in the Euclidean radius, no onelegs will be proposed for association
+			# else onelegs will be tried, infuture JPDAF will be preferred, as onelegs can be highly spurious
+			# But, here in the paper, we prefer smoothing later to remove false alarms
+			# NOTE: Euclidean distance can be replaced with Mahalanobis
+			# REVISE: twolegs using same GNN approach using Mahalanobis distance
+
+
+			# print self.track_KF_people
+			for objid in self.track_KF_people:
+				cost_matrix.append([])
+				V = np.array([[self.kalman_filters_people[_lidx].P[0,0],self.kalman_filters_people[_lidx].P[0,3]],[self.kalman_filters_people[_lidx].P[3,0],self.kalman_filters_people[_lidx].P[3,3]]])
+				V = V + np.array([[RMAHALANOBIS,0],[0,RMAHALANOBIS]])
+				for leg in twolegs_track:
+					_mdist = mahalanobis(np.array([self.track_KF_point_people[_lidx][0], self.track_KF_point_people[_lidx][1]]),
+							np.array([leg[6],leg[7]]),
+							np.linalg.inv(V))
+					cost_matrix[-1].append(_mdist)
+				_lidx = _lidx + 1
+
+			track_KF_new = []
+			track_conf_new = []
+			track_KF_point_new = []
+			kalman_filters_new = []
+			rows = []
+			columns = []
+			indexes = []
+
+			if _lidx > 0:
+				cost_matrix = squareMatrix(cost_matrix, COST_MAX_GATING)
+				indexes = self.munkres.compute(cost_matrix)
+			for row, column in indexes:
+				rows.append(row)
+				columns.append(column)
+
+			for i in range(len(twolegs_track)):
+				if i not in columns or cost_matrix[rows[columns.index(i)]][i] >= COST_MAX_GATING:
+					kalman_filters_new.append(createPersonKF(twolegs_track[i][6], twolegs_track[i][7]))
+					track_KF_point_new.append([twolegs_track[i][6], twolegs_track[i][7]])
+					track_KF_new.append(self._people_id)
+					track_conf_new.append(twolegs_track[i][8])
+					self._people_id = self._people_id + 1
+				else:
+					kalman_filters_new.append(self.kalman_filters_people[rows[columns.index(i)]])
+					self.kalman_filters_people[rows[columns.index(i)]].update([twolegs_track[i][6], twolegs_track[i][7]]) 
+
+					_x_updated = self.kalman_filters_people[rows[columns.index(i)]].x
+					track_KF_point_new.append([_x_updated[0], _x_updated[3]])
+
+					track_KF_new.append(self.track_KF_people[rows[columns.index(i)]])
+					track_conf_new.append(self.track_conf_people[rows[columns.index(i)]]*DECAY_RATE + twolegs_track[i][8]*(1-DECAY_RATE))
+
+			for kf_obji in self.track_KF_people:
+				if kf_obji not in track_KF_new:
+					_index = self.track_KF_people.index(kf_obji)
+					_conf = self.track_conf_people[_index]*DECAY_RATE
+					if _conf > DECAY_THRES:
+						kalman_filters_new.append(self.kalman_filters_people[_index])
+						track_conf_new.append(_conf)
+						track_KF_point_new.append([self.track_KF_point_people[_index][0],self.track_KF_point_people[_index][1]]) #, track_KF_point[_index][2] ,track_KF_point[_index][3]])
+						track_KF_new.append(kf_obji)
+
+
+			self.kalman_filters_people= kalman_filters_new
+			self.track_KF_people= track_KF_new
+			self.track_conf_people= track_conf_new
+			self.track_KF_point_people= track_KF_point_new
+
+			# tracks_KF.append(track_KF)
+			# tracks_conf.append(track_conf)
+			# tracks_KF_points.append(track_KF_point)
+
+		# _frame_idx = _frame_idx + 1
+
+	# return tracks_KF, _person_id-1, tracks_KF_points, tracks_conf
 
 def aggreateCoord(data):
 	xs, ys = [], []
