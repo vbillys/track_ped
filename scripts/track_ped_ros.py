@@ -25,7 +25,8 @@ RMAHALANOBIS = 2. #.5 #2.5 #2.5
 PERSON_GATING_DISTANCE = 0.8
 
 class PeopleTrackerFromLegs:
-	def __init__(self, display, pub_persons):
+	def __init__(self, display, pub_persons, use_display):
+		self.use_display = use_display
 		self.munkres = Munkres()
 		self.kalman_filters_leg = []
 		self._first_leg = False
@@ -220,13 +221,15 @@ class PeopleTrackerFromLegs:
 			self.findPeopleTracks()
 			self.processMunkresKalmanPeople()
 			self.publishPersons()
-			if not self._first_leg:
-				self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people)
-			else:
-				self.display.update(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people)
+			if self.use_display:
+				if not self._first_leg:
+					self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people)
+				else:
+					self.display.update(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people)
 		else:
 			# print 'Skipping frame %d, empty data, may not real time' % (_frame_idx)
-			print 'Skipping frame ..., empty data, may not real time'
+			if self.use_display:
+				print 'Skipping frame ..., empty data, may not real time'
 
 		# _frame_idx = _frame_idx + 1
 
@@ -329,8 +332,9 @@ class PeopleTrackerFromLegs:
 			self.twolegs_track = []
 			# onelegs_tracks.append([[0, track[0][0], track[0][1]]])
 			self.onelegs_track = [[0, track[0][0], track[0][1]]]
-		print self.twolegs_track
-		print self.onelegs_track
+		if self.use_display:
+				print self.twolegs_track
+				print self.onelegs_track
 		# return twolegs_tracks, onelegs_tracks
 
 	def processMunkresKalmanPeople(self):
@@ -543,6 +547,7 @@ class AnimatedScatter:
 # people_tracker = PeopleTrackerFromLegs(display_tracker)
 display_tracker = None
 people_tracker = None
+g_use_display = False
 def processLegArray(msg):
 	# print msg
 	tic = time.time()
@@ -555,7 +560,8 @@ def processLegArray(msg):
 	people_tracker.processMunkresKalman(points)
 	# people_tracker.findPeopleTracks()
 	toc = time.time()
-	print toc - tic
+	if g_use_display:
+		print toc - tic
 
 
 def talker():
@@ -565,7 +571,7 @@ def talker():
 	rospy.Subscriber('/legs', LegMeasurementArray, processLegArray)
 	g_pub_ppl = rospy.Publisher('/persons', PersonTrackArray, queue_size = 10)
 	display_tracker= AnimatedScatter()
-	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl)
+	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display)
 	rospy.spin()
 	pass
 
