@@ -364,6 +364,7 @@ display_tracker= AnimatedScatter()
 people_tracker = PeopleTrackerFromLegs(display_tracker)
 def processLegArray(msg):
 	# print msg
+	tic = time.time()
 	points = []
 	for l in msg.Legs:
 		# print l
@@ -372,6 +373,8 @@ def processLegArray(msg):
 		points.append([l.xLeg, l.yLeg, l.ConLeg])
 	people_tracker.processMunkresKalman(points)
 	# people_tracker.findPeopleTracks()
+	toc = time.time()
+	print toc - tic
 
 
 def talker():
