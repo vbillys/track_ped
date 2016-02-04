@@ -21,6 +21,7 @@ import matplotlib.animation as animation
 # f_handle = open('ped_data_3.csv','r')
 # f_handle = open('ped_data_4.csv','r')
 f_handle = open('ped_data_5.csv','r')
+# f_handle = open('ped_data_6.csv','r')
 
 
 
@@ -614,6 +615,19 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 
 	return tracks_KF, _person_id-1, tracks_KF_points, tracks_conf, tracks_KF_confirmations
 
+CLIP_Y_MIN = 0 #1. #0.5
+CLIP_Y_MAX = 4 #3.5
+CLIP_X_ABS =10 
+def clipPoints(points, abs_max_x, max_y):
+	clipped_points = []
+	for frame in points:
+		clipped_points.append([])
+		for point in frame:
+			if point[0] > -abs_max_x and point[0] < abs_max_x and point[1] > CLIP_Y_MIN  and point[1] < max_y:
+				clipped_points[-1].append(point)
+	return clipped_points
+
+
 def processMunkresKalman(points):
 
 	kalman_filters = []
@@ -902,6 +916,7 @@ for str_ in f_content:
 # print points
 # tracks_munkres , max_obj_id = processMunkres(points)
 t_start = time.time()
+points = clipPoints(points, CLIP_X_ABS , CLIP_Y_MAX)
 tracks_munkres , max_obj_id , tracks_KF_points, tracks_conf= processMunkresKalman(points)
 people_2legs_tracks, people_1leg_tracks = findPeopleTracks(tracks_KF_points, tracks_conf)
 tracks_KF_people, max_people_id, tracks_KF_people_pp, tracks_people_conf, tracks_confirms = processMunkresKalmanPeople(people_2legs_tracks, people_1leg_tracks)
