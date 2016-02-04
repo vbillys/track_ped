@@ -20,8 +20,8 @@ import matplotlib.animation as animation
 # f_handle = open('ped_data_2.csv','r')
 # f_handle = open('ped_data_3.csv','r')
 # f_handle = open('ped_data_4.csv','r')
-f_handle = open('ped_data_5.csv','r')
-# f_handle = open('ped_data_6.csv','r')
+# f_handle = open('ped_data_5.csv','r')
+f_handle = open('ped_data_6.csv','r')
 
 
 
@@ -623,7 +623,7 @@ def clipPoints(points, abs_max_x, max_y):
 	for frame in points:
 		clipped_points.append([])
 		for point in frame:
-			if point[0] > -abs_max_x and point[0] < abs_max_x and point[1] > CLIP_Y_MIN  and point[1] < max_y:
+			if point[1] > -abs_max_x and point[1] < abs_max_x and point[0] > CLIP_Y_MIN  and point[0] < max_y:
 				clipped_points[-1].append(point)
 	return clipped_points
 

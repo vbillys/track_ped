@@ -17,6 +17,7 @@ import matplotlib.animation as animation
 from CustomCreateKF import createLegKF, createPersonKF, squareMatrix
 
 g_pub_ppl = None
+g_use_display = True #False
 
 COST_MAX_GATING = .8 #1.5 #.7 #1.5 #.7 #1.5
 DECAY_RATE = 0.93
@@ -543,11 +544,22 @@ class AnimatedScatter:
 		self.fig.canvas.draw()
 		# plt.draw()
 
+CLIP_Y_MIN = 0 #1. #0.5
+CLIP_Y_MAX = 4 #3.5
+CLIP_X_ABS =10 
+def clipPoints(frame, abs_max_x, max_y):
+	clipped_points = []
+	# for frame in points:
+		# clipped_points.append([])
+	for point in frame:
+		if point[1] > -abs_max_x and point[1] < abs_max_x and point[0] > CLIP_Y_MIN  and point[0] < max_y:
+			clipped_points.append(point)
+	return clipped_points
+
 # display_tracker= AnimatedScatter()
 # people_tracker = PeopleTrackerFromLegs(display_tracker)
 display_tracker = None
 people_tracker = None
-g_use_display = False
 def processLegArray(msg):
 	# print msg
 	tic = time.time()
@@ -557,6 +569,7 @@ def processLegArray(msg):
 		if l.xLeg == 0 and l.yLeg == 0:
 			continue
 		points.append([l.xLeg, l.yLeg, l.ConLeg])
+	points = clipPoints(points, CLIP_X_ABS , CLIP_Y_MAX)
 	people_tracker.processMunkresKalman(points)
 	# people_tracker.findPeopleTracks()
 	toc = time.time()
