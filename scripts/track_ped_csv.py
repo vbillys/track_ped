@@ -16,11 +16,11 @@ import pylab as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
 
-f_handle = open('ped_data.csv','r')
+# f_handle = open('ped_data.csv','r')
 # f_handle = open('ped_data_2.csv','r')
 # f_handle = open('ped_data_3.csv','r')
 # f_handle = open('ped_data_4.csv','r')
-# f_handle = open('ped_data_5.csv','r')
+f_handle = open('ped_data_5.csv','r')
 
 
 
@@ -367,9 +367,11 @@ def squareMatrix(mat, fillconstant):
 	return newmat
 
 COST_MAX_GATING = .8 #1.5 #.7 #1.5 #.7 #1.5
+COST_MAX_GATING_ONELEG = .8 #1.5 #.7 #1.5 #.7 #1.5
 DECAY_RATE = 0.93
 DECAY_THRES = 0.3
 RMAHALANOBIS = 2. #.5 #2.5 #2.5
+MAX_DIST_PERSON_ONELEG = .3
 
 def getVMatrixCAModel(k_filter):
 	V = np.array([[k_filter.P[0,0],k_filter.P[0,3]],[k_filter.P[3,0],k_filter.P[3,3]]])
@@ -391,13 +393,15 @@ def isThereAnyOneLegAround(KF_point,k_filter, onelegs_track):
 		_mdist = mahalanobis(np.array([oneleg[1], oneleg[2]]),
 				np.array([KF_point[0],KF_point[1]]),
 				np.linalg.inv(V))
-		if _mdist < COST_MAX_GATING:
-			_edist = math.hypot(oneleg[1] - KF_point[0], oneleg[2] - KF_point[1])
+		_edist = math.hypot(oneleg[1] - KF_point[0], oneleg[2] - KF_point[1])
+		# if _mdist < COST_MAX_GATING_ONELEG:
+		if _edist < MAX_DIST_PERSON_ONELEG:
 			indexes.append(index)
 			mdists.append(_mdist)
 			edists.append(_edist)
 			ratio_dists.append(_mdist/_edist)
 		index = index + 1
+	# indexes = []
 	return  indexes, mdists, edists, ratio_dists, sum(ratio_dists)
 
 # mx, my = getMMSEOneLegs(_check, onelegs_track)
@@ -536,10 +540,10 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 						if _conf > DECAY_THRES:
 							_R = kalman_filters[_index].R
 							mx, my, RR = getMMSEOneLegs(_check, onelegs_track, _R, track_KF_point[_index])
-							kalman_filters_new.append(kalman_filters[_index])
 							kalman_filters[_index].R = RR
 							kalman_filters[_index].update([mx, my])
 							kalman_filters[_index].R = _R
+							kalman_filters_new.append(kalman_filters[_index])
 							track_conf_new.append(_conf)
 							track_KF_point_new.append([track_KF_point[_index][0],track_KF_point[_index][1]
 								,track_KF_point[_index][2]
