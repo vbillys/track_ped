@@ -17,13 +17,70 @@ import matplotlib.animation as animation
 from CustomCreateKF import createLegKF, createPersonKF, squareMatrix
 
 g_pub_ppl = None
-g_use_display = True #False
+g_use_display = False #True #False
 
 COST_MAX_GATING = .8 #1.5 #.7 #1.5 #.7 #1.5
+COST_MAX_GATING_ONELEG = .8 #1.5 #.7 #1.5 #.7 #1.5
 DECAY_RATE = 0.93
 DECAY_THRES = 0.3
+IMPROVE_RATE = 0.05
+PERSON_CONFIRM_THRES = 0.5
 RMAHALANOBIS = 2. #.5 #2.5 #2.5
+MAX_DIST_PERSON_ONELEG = 1 #.3
 PERSON_GATING_DISTANCE = 0.8
+
+
+def getVMatrixCAModel(k_filter):
+	V = np.array([[k_filter.P[0,0],k_filter.P[0,3]],[k_filter.P[3,0],k_filter.P[3,3]]])
+	V = V + np.array([[RMAHALANOBIS,0],[0,RMAHALANOBIS]])
+	return V
+
+def calcMahalanobisDistance(first_p, second_p, V):
+	return mahalanobis (np.array([first_p[0], first_p[1]]), np.array([second_p[0], second_p[1]]), np.linalg.inv(V))
+
+def isThereAnyOneLegAround(KF_point,k_filter, onelegs_track):
+	V = getVMatrixCAModel(k_filter)
+
+	index = 0
+	indexes = []
+	mdists = []
+	edists = []
+	ratio_dists = []
+	for oneleg in onelegs_track:
+		_mdist = mahalanobis(np.array([oneleg[1], oneleg[2]]),
+				np.array([KF_point[0],KF_point[1]]),
+				np.linalg.inv(V))
+		_edist = math.hypot(oneleg[1] - KF_point[0], oneleg[2] - KF_point[1])
+		# if _mdist < COST_MAX_GATING_ONELEG:
+		if _edist < MAX_DIST_PERSON_ONELEG:
+			indexes.append(index)
+			mdists.append(_mdist)
+			edists.append(_edist)
+			ratio_dists.append(_mdist/_edist)
+		index = index + 1
+	# indexes = []
+	return  indexes, mdists, edists, ratio_dists, sum(ratio_dists)
+
+# mx, my = getMMSEOneLegs(_check, onelegs_track)
+def getMMSEOneLegs(check, onelegs_track, R, KF_point):
+	_noidx = 0
+	mmse_x = 0
+	mmse_y = 0
+	P_mmse = np.array([[0,0],[0,0]])
+	for index in check[0]:
+		_ratio = check[3][_noidx]/check[4]
+		mmse_x = mmse_x + (onelegs_track[index][1]-KF_point[0])*_ratio
+		mmse_y = mmse_y + (onelegs_track[index][2]-KF_point[1])*_ratio
+		_noidx = _noidx + 1
+	_noidx = 0
+	for index in check[0]:
+		_ratio = check[3][_noidx]/check[4]
+		_delta_x = onelegs_track[index][1] - mmse_x
+		_delta_y = onelegs_track[index][2] - mmse_y
+		P_mmse = P_mmse + (R + np.array([_delta_x,_delta_y])*np.array([[_delta_x],[_delta_y]]))*_ratio
+		_noidx = _noidx + 1
+
+	return mmse_x , mmse_y, P_mmse
 
 class PeopleTrackerFromLegs:
 	def __init__(self, display, pub_persons, use_display):
@@ -49,6 +106,8 @@ class PeopleTrackerFromLegs:
 		self.track_conf_people = []
 		self.track_KF_point_people = []
 		self._people_id = 1
+		self.track_KF_confirmations = []
+		self.track_KF_improvements = []
 
 		self.pub_persons = pub_persons
 
@@ -332,7 +391,7 @@ class PeopleTrackerFromLegs:
 			# twolegs_tracks.append([])
 			self.twolegs_track = []
 			# onelegs_tracks.append([[0, track[0][0], track[0][1]]])
-			self.onelegs_track = [[0, track[0][0], track[0][1]]]
+			self.onelegs_track = [[0, track[0][0], track[0][1], conf[0]]]
 		if self.use_display:
 				print self.twolegs_track
 				print self.onelegs_track
@@ -354,6 +413,8 @@ class PeopleTrackerFromLegs:
 			track_KF = []
 			track_conf = []
 			track_KF_point = []
+			track_KF_confirmations = []
+			track_KF_improvements = []
 			# _person_id = 1
 			if len(twolegs_track) > 0:
 				self._first_people = True
@@ -361,7 +422,9 @@ class PeopleTrackerFromLegs:
 					track_KF.append(self._people_id)
 					self.kalman_filters_people.append(createPersonKF(twoleg[6], twoleg[7]))
 					track_conf.append(twoleg[8])
-					track_KF_point.append([twoleg[6], twoleg[7]])
+					track_KF_point.append([twoleg[6], twoleg[7], twoleg[2] , twoleg[3], twoleg[4], twoleg[5]])
+					track_KF_improvements.append(twoleg[8]*IMPROVE_RATE)
+					track_KF_confirmations.append(False)
 					self._people_id = self._people_id + 1
 
 			# else:
@@ -371,13 +434,21 @@ class PeopleTrackerFromLegs:
 			self.track_KF_people = track_KF
 			self.track_conf_people = track_conf
 			self.track_KF_point_people = track_KF_point
+			self.track_KF_improvements = track_KF_improvements
+			self.track_KF_confirmations = track_KF_confirmations
 
 		else:
 			track_KF_point_new = []
+			_kidx = 0
 			for kf in self.kalman_filters_people:
 				kf.predict()
 				_x_updated = kf.x
-				track_KF_point_new.append([_x_updated[0], _x_updated[3]])
+				track_KF_point_new.append([_x_updated[0], _x_updated[3], self.track_KF_point_people[_kidx][2]
+					,self.track_KF_point_people[_kidx][3]
+					,self.track_KF_point_people[_kidx][4]
+					,self.track_KF_point_people[_kidx][5]
+					])
+				_kidx = _kidx + 1
 			track_KF_point = track_KF_point_new
 			cost_matrix = []
 			_lidx = 0
@@ -406,6 +477,8 @@ class PeopleTrackerFromLegs:
 			track_conf_new = []
 			track_KF_point_new = []
 			kalman_filters_new = []
+			track_KF_confirmations_new = []
+			track_KF_improvements_new = []
 			rows = []
 			columns = []
 			indexes = []
@@ -420,35 +493,84 @@ class PeopleTrackerFromLegs:
 			for i in range(len(twolegs_track)):
 				if i not in columns or cost_matrix[rows[columns.index(i)]][i] >= COST_MAX_GATING:
 					kalman_filters_new.append(createPersonKF(twolegs_track[i][6], twolegs_track[i][7]))
-					track_KF_point_new.append([twolegs_track[i][6], twolegs_track[i][7]])
+					# track_KF_point_new.append([twolegs_track[i][6], twolegs_track[i][7]])
+					track_KF_point_new.append([twolegs_track[i][6],twolegs_track[i][7], twolegs_track[i][2] , twolegs_track[i][3], twolegs_track[i][4], twolegs_track[i][5]])
 					track_KF_new.append(self._people_id)
 					track_conf_new.append(twolegs_track[i][8])
+					track_KF_improvements_new.append(twolegs_track[i][8]*IMPROVE_RATE)
+					track_KF_confirmations_new.append(False)
 					self._people_id = self._people_id + 1
 				else:
 					kalman_filters_new.append(self.kalman_filters_people[rows[columns.index(i)]])
 					self.kalman_filters_people[rows[columns.index(i)]].update([twolegs_track[i][6], twolegs_track[i][7]]) 
 
 					_x_updated = self.kalman_filters_people[rows[columns.index(i)]].x
-					track_KF_point_new.append([_x_updated[0], _x_updated[3]])
+					track_KF_point_new.append([_x_updated[0], _x_updated[3], twolegs_track[i][2]
+						, twolegs_track[i][3]
+						, twolegs_track[i][4]
+						, twolegs_track[i][5]
+						])
 
 					track_KF_new.append(self.track_KF_people[rows[columns.index(i)]])
 					track_conf_new.append(self.track_conf_people[rows[columns.index(i)]]*DECAY_RATE + twolegs_track[i][8]*(1-DECAY_RATE))
+					_improve = self.track_KF_improvements[rows[columns.index(i)]] + twolegs_track[i][8]*IMPROVE_RATE
+					track_KF_improvements_new.append(_improve)
+					if _improve > PERSON_CONFIRM_THRES:
+						track_KF_confirmations_new.append(True)
+					else:
+						track_KF_confirmations_new.append(False)
+
 
 			for kf_obji in self.track_KF_people:
 				if kf_obji not in track_KF_new:
 					_index = self.track_KF_people.index(kf_obji)
-					_conf = self.track_conf_people[_index]*DECAY_RATE
-					if _conf > DECAY_THRES:
-						kalman_filters_new.append(self.kalman_filters_people[_index])
-						track_conf_new.append(_conf)
-						track_KF_point_new.append([self.track_KF_point_people[_index][0],self.track_KF_point_people[_index][1]]) #, track_KF_point[_index][2] ,track_KF_point[_index][3]])
-						track_KF_new.append(kf_obji)
+					_check = isThereAnyOneLegAround(self.track_KF_point_people[_index],self.kalman_filters_people[_index], onelegs_track)
+					if _check[0]:
+						_gated_len = len(_check[0])
+						# print _check, _check[0]
+						# print onelegs_track
+						_gated_sum_conf = sum([onelegs_track[s][3] for s in _check[0]])
+						_conf = self.track_conf_people[_index]*DECAY_RATE + (_gated_sum_conf/_gated_len)*(1-DECAY_RATE)
+						if _conf > DECAY_THRES:
+							_R = self.kalman_filters_people[_index].R
+							mx, my, RR = getMMSEOneLegs(_check, onelegs_track, _R, self.track_KF_point_people[_index])
+							self.kalman_filters_people[_index].R = RR
+							self.kalman_filters_people[_index].update([mx, my])
+							self.kalman_filters_people[_index].R = _R
+							kalman_filters_new.append(self.kalman_filters_people[_index])
+							track_conf_new.append(_conf)
+							track_KF_point_new.append([self.track_KF_point_people[_index][0],self.track_KF_point_people[_index][1]
+								,self.track_KF_point_people[_index][2]
+								,self.track_KF_point_people[_index][3]
+								,self.track_KF_point_people[_index][4]
+								,self.track_KF_point_people[_index][5]
+								]) #, track_KF_point[_index][2] ,track_KF_point[_index][3]])
+							track_KF_new.append(kf_obji)
+							track_KF_improvements_new.append(self.track_KF_improvements[_index])
+							track_KF_confirmations_new.append(self.track_KF_confirmations[_index])
+
+					else:
+						_conf = self.track_conf_people[_index]*DECAY_RATE
+						if _conf > DECAY_THRES:
+							kalman_filters_new.append(self.kalman_filters_people[_index])
+							track_conf_new.append(_conf)
+							track_KF_point_new.append([self.track_KF_point_people[_index][0],self.track_KF_point_people[_index][1]
+								,self.track_KF_point_people[_index][2]
+								,self.track_KF_point_people[_index][3]
+								,self.track_KF_point_people[_index][4]
+								,self.track_KF_point_people[_index][5]
+								]) #, track_KF_point[_index][2] ,track_KF_point[_index][3]])
+							track_KF_new.append(kf_obji)
+							track_KF_improvements_new.append(self.track_conf_people[_index])
+							track_KF_confirmations_new.append(self.track_conf_people[_index])
 
 
 			self.kalman_filters_people= kalman_filters_new
 			self.track_KF_people= track_KF_new
 			self.track_conf_people= track_conf_new
 			self.track_KF_point_people= track_KF_point_new
+			self.track_KF_improvements = track_KF_improvements_new
+			self.track_KF_confirmations = track_KF_confirmations_new
 
 			# tracks_KF.append(track_KF)
 			# tracks_conf.append(track_conf)
