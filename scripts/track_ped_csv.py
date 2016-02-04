@@ -36,7 +36,7 @@ class AnimatedScatter(object):
 	def setup_plot(self):
 		# x, y, c, ct, obj_id, xkf, ykf = next(self.stream)
 		# x, y, c, ct, obj_id, xkf, ykf, twoleg_xs, twoleg_ys, oneleg_xs, oneleg_ys = next(self.stream)
-		x, y, c, ct, obj_id, xkf, ykf, twoleg_xs, twoleg_ys, oneleg_xs, oneleg_ys, xp, yp, ppl_id = next(self.stream)
+		x, y, c, ct, obj_id, xkf, ykf, twoleg_xs, twoleg_ys, oneleg_xs, oneleg_ys, xp, yp, ppl_id, ppl_cfm = next(self.stream)
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, s=128)
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.coolwarm, s=128)
 		self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.PuOr, s=128)
@@ -91,7 +91,10 @@ class AnimatedScatter(object):
 			texts = []
 			for _ct in data[13]:
 				ix , iy = data[11][_idx] , data[12][_idx]
-				text = self.ax.text(ix, iy + 0.3, str(data[13][_idx]))
+				if data[14][_idx]:
+					text = self.ax.text(ix, iy + 0.3, str(data[13][_idx]), color='red')
+				else:
+					text = self.ax.text(ix, iy + 0.3, str(data[13][_idx]))
 				texts.append(text)
 				_idx = _idx + 1
 			clearables = clearables + [self.scat3] + texts
@@ -182,7 +185,7 @@ def plotPoints(data):
 	# a = AnimatedScatter(points_tracked)
 	# plt.show()
 
-def animatePoints(data, tracks_munkres, max_obj_id, KF_points, twolegs_tracks, onelegs_tracks, people_KF_points, tracks_people):
+def animatePoints(data, tracks_munkres, max_obj_id, KF_points, twolegs_tracks, onelegs_tracks, people_KF_points, tracks_people, tracks_confirms):
 	# print onelegs_tracks
 	maxlen = len(max(data,key=len))
 	print 'maxlen',maxlen
@@ -220,6 +223,7 @@ def animatePoints(data, tracks_munkres, max_obj_id, KF_points, twolegs_tracks, o
 			xskf_people = []
 			yskf_people = []
 			people_id = []
+			people_confirm = []
 
 
 			_i = 0
@@ -257,6 +261,7 @@ def animatePoints(data, tracks_munkres, max_obj_id, KF_points, twolegs_tracks, o
 					xskf_people.append(people_KF_points[_idx][_i][0])
 					yskf_people.append(people_KF_points[_idx][_i][1])
 					people_id.append(tracks_people[_idx][_i])
+					people_confirm.append(tracks_confirms[_idx][_i])
 					_i = _i + 1
 
 			for _pp in twolegs_tracks[_idx]:
@@ -271,7 +276,7 @@ def animatePoints(data, tracks_munkres, max_obj_id, KF_points, twolegs_tracks, o
 
 			# points_timed[-1] = (xs, ys, cs, cst, obj_id, xskf, yskf)
 			# points_timed[-1] = (xs, ys, cs, cst, obj_id, xskf, yskf, twoleg_xs, twoleg_ys, oneleg_xs, oneleg_ys)
-			points_timed[-1] = (xs, ys, cs, cst, obj_id, xskf, yskf, twoleg_xs, twoleg_ys, oneleg_xs, oneleg_ys, xskf_people, yskf_people, people_id)
+			points_timed[-1] = (xs, ys, cs, cst, obj_id, xskf, yskf, twoleg_xs, twoleg_ys, oneleg_xs, oneleg_ys, xskf_people, yskf_people, people_id, people_confirm)
 			# tracks_timed[-1] = (xs, ys, cst)
 			_idx = _idx + 1
 
@@ -370,8 +375,11 @@ COST_MAX_GATING = .8 #1.5 #.7 #1.5 #.7 #1.5
 COST_MAX_GATING_ONELEG = .8 #1.5 #.7 #1.5 #.7 #1.5
 DECAY_RATE = 0.93
 DECAY_THRES = 0.3
+IMPROVE_RATE = 0.05
+PERSON_CONFIRM_THRES = 0.5
 RMAHALANOBIS = 2. #.5 #2.5 #2.5
 MAX_DIST_PERSON_ONELEG = .3
+PERSON_GATING_DISTANCE = 0.8
 
 def getVMatrixCAModel(k_filter):
 	V = np.array([[k_filter.P[0,0],k_filter.P[0,3]],[k_filter.P[3,0],k_filter.P[3,3]]])
@@ -434,6 +442,8 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 	tracks_KF_points = []
 	_frame_idx = 0
 	# createPersonKF(0,0)
+	tracks_KF_confirmations = []
+	tracks_KF_improvements = []
 
 	for twolegs_track, onelegs_track in zip (twolegs_tracks, onelegs_tracks):
 		if not _first:
@@ -441,6 +451,8 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 			track_KF = []
 			track_conf = []
 			track_KF_point = []
+			track_KF_confirmations = []
+			track_KF_improvements = []
 			_person_id = 1
 			if len(twolegs_track) > 0:
 				_first = True
@@ -450,11 +462,15 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 					track_conf.append(twoleg[8])
 					_person_id = _person_id + 1
 					track_KF_point.append([twoleg[6],twoleg[7], twoleg[2] , twoleg[3], twoleg[4], twoleg[5]])
+					track_KF_improvements.append(twoleg[8]*IMPROVE_RATE)
+					track_KF_confirmations.append(False)
 
 			# else:
 			tracks_KF.append(track_KF)
 			tracks_conf.append(track_conf)
 			tracks_KF_points.append(track_KF_point)
+			tracks_KF_improvements.append(track_KF_improvements)
+			tracks_KF_confirmations.append(track_KF_confirmations)
 
 		else:
 			track_KF_point_new = []
@@ -495,6 +511,8 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 			track_conf_new = []
 			track_KF_point_new = []
 			kalman_filters_new = []
+			track_KF_confirmations_new = []
+			track_KF_improvements_new = []
 			rows = []
 			columns = []
 
@@ -512,6 +530,8 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 					track_KF_point_new.append([twolegs_track[i][6],twolegs_track[i][7], twolegs_track[i][2] , twolegs_track[i][3], twolegs_track[i][4], twolegs_track[i][5]])
 					track_KF_new.append(_person_id)
 					track_conf_new.append(twolegs_track[i][8])
+					track_KF_improvements_new.append(twolegs_track[i][8]*IMPROVE_RATE)
+					track_KF_confirmations_new.append(False)
 					_person_id = _person_id + 1
 				else:
 					kalman_filters_new.append(kalman_filters[rows[columns.index(i)]])
@@ -526,6 +546,12 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 
 					track_KF_new.append(track_KF[rows[columns.index(i)]])
 					track_conf_new.append(track_conf[rows[columns.index(i)]]*DECAY_RATE + twolegs_track[i][8]*(1-DECAY_RATE))
+					_improve = track_KF_improvements[rows[columns.index(i)]] + twolegs_track[i][8]*IMPROVE_RATE
+					track_KF_improvements_new.append(_improve)
+					if _improve > PERSON_CONFIRM_THRES:
+						track_KF_confirmations_new.append(True)
+					else:
+						track_KF_confirmations_new.append(False)
 
 			for kf_obji in track_KF:
 				if kf_obji not in track_KF_new:
@@ -552,6 +578,8 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 								,track_KF_point[_index][5]
 								]) #, track_KF_point[_index][2] ,track_KF_point[_index][3]])
 							track_KF_new.append(kf_obji)
+							track_KF_improvements_new.append(track_KF_improvements[_index])
+							track_KF_confirmations_new.append(track_KF_confirmations[_index])
 
 					else:
 						_conf = track_conf[_index]*DECAY_RATE
@@ -565,20 +593,26 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 								,track_KF_point[_index][5]
 								]) #, track_KF_point[_index][2] ,track_KF_point[_index][3]])
 							track_KF_new.append(kf_obji)
+							track_KF_improvements_new.append(track_KF_improvements[_index])
+							track_KF_confirmations_new.append(track_KF_confirmations[_index])
 
 
 			kalman_filters = kalman_filters_new
 			track_KF = track_KF_new
 			track_conf = track_conf_new
 			track_KF_point = track_KF_point_new
+			track_KF_confirmations = track_KF_confirmations_new
+			track_KF_improvements = track_KF_improvements_new
 
 			tracks_KF.append(track_KF)
 			tracks_conf.append(track_conf)
 			tracks_KF_points.append(track_KF_point)
+			tracks_KF_improvements.append(track_KF_improvements)
+			tracks_KF_confirmations.append(track_KF_confirmations)
 
 		_frame_idx = _frame_idx + 1
 
-	return tracks_KF, _person_id-1, tracks_KF_points, tracks_conf
+	return tracks_KF, _person_id-1, tracks_KF_points, tracks_conf, tracks_KF_confirmations
 
 def processMunkresKalman(points):
 
@@ -756,7 +790,6 @@ def processMunkresKalman(points):
 	return tracks, _obj_id-1, tracks_KF_points, tracks_conf
 	pass
 
-PERSON_GATING_DISTANCE = 0.8
 def findPeopleTracks(leg_tracks, leg_confs):
 	# people_tracks = []
 	twolegs_tracks = []
@@ -871,14 +904,14 @@ for str_ in f_content:
 t_start = time.time()
 tracks_munkres , max_obj_id , tracks_KF_points, tracks_conf= processMunkresKalman(points)
 people_2legs_tracks, people_1leg_tracks = findPeopleTracks(tracks_KF_points, tracks_conf)
-tracks_KF_people, max_people_id, tracks_KF_people_pp, tracks_people_conf = processMunkresKalmanPeople(people_2legs_tracks, people_1leg_tracks)
+tracks_KF_people, max_people_id, tracks_KF_people_pp, tracks_people_conf, tracks_confirms = processMunkresKalmanPeople(people_2legs_tracks, people_1leg_tracks)
 t_end = time.time()
 print (-t_start + t_end) , len(points), (-t_start + t_end) / len(points)
 plotPoints(points)
 # print people_2legs_tracks
 # print tracks_KF_people_pp
 # print tracks_KF_points
-animatePoints(points, tracks_munkres, max_obj_id, tracks_KF_points, people_2legs_tracks, people_1leg_tracks, tracks_KF_people_pp, tracks_KF_people)
+animatePoints(points, tracks_munkres, max_obj_id, tracks_KF_points, people_2legs_tracks, people_1leg_tracks, tracks_KF_people_pp, tracks_KF_people, tracks_confirms)
 # plotPoints(points_processed)
 # animatePoints(points_processed)
 
