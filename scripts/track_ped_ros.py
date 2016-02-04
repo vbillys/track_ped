@@ -283,9 +283,9 @@ class PeopleTrackerFromLegs:
 			self.publishPersons()
 			if self.use_display:
 				if not self._first_leg:
-					self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people)
+					self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations)
 				else:
-					self.display.update(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people)
+					self.display.update(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations)
 		else:
 			# print 'Skipping frame %d, empty data, may not real time' % (_frame_idx)
 			if self.use_display:
@@ -605,11 +605,14 @@ def aggreateCoord(data):
 		ys.append(leg[1])
 	return xs, ys
 
-def createIds(xx, yy, ids, ax):
+def createIds(xx, yy, ids, cfms, ax):
 	index = 0
 	texts = []
 	for _id in ids:
-		text = ax.text(xx[index], yy[index] + 0.3, str(_id))
+		if cfms[index]:
+			text = ax.text(xx[index], yy[index] + 0.3, str(_id), color='red')
+		else:
+			text = ax.text(xx[index], yy[index] + 0.3, str(_id))
 		texts.append(text)
 		index = index + 1
 	return texts
@@ -637,12 +640,12 @@ class AnimatedScatter:
 			text.remove()
 		self.texts = []
 
-	def setup_plot(self, data, data_kf, data_pp_ppl, data_kf_ppl):
+	def setup_plot(self, data, data_kf, data_pp_ppl, data_kf_ppl, data_kf_ppl_cfm):
 		xs, ys = aggreateCoord(data)
 		xskf, yskf = aggreateCoord(data_kf)
 		xskfppl , yskfppl = aggreateCoord(data_pp_ppl)
 		self.removeTexts()
-		self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, self.ax)
+		self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, self.ax)
 		# self.scat = self.ax.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
 		self.scat.set_offsets(np.column_stack((xs, ys)))
 		self.scat2.set_offsets(np.column_stack((xskf, yskf)))
@@ -652,12 +655,12 @@ class AnimatedScatter:
 		self.fig.canvas.draw()
 		# plt.draw()
 
-	def update(self,data, data_kf, data_pp_ppl, data_kf_ppl):
+	def update(self,data, data_kf, data_pp_ppl, data_kf_ppl, data_kf_ppl_cfm):
 		xs, ys = aggreateCoord(data)
 		xskf, yskf = aggreateCoord(data_kf)
 		xskfppl , yskfppl = aggreateCoord(data_pp_ppl)
 		self.removeTexts()
-		self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, self.ax)
+		self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, self.ax)
 		# plt.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
 		self.scat.set_offsets(np.column_stack((xs, ys)))
 		self.scat2.set_offsets(np.column_stack((xskf, yskf)))
