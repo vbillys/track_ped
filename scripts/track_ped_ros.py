@@ -19,6 +19,7 @@ from CustomCreateKF import createLegKF, createPersonKF, squareMatrix
 
 g_pub_ppl = None
 g_use_display = True #True #False
+g_use_decay_when_nodata = False #True
 
 COST_MAX_GATING = .8 #1.5 #.7 #1.5 #.7 #1.5
 COST_MAX_GATING_ONELEG = .8 #1.5 #.7 #1.5 #.7 #1.5
@@ -105,8 +106,9 @@ def getMMSEOneLegs(check, onelegs_track, R, KF_point, P):
 	return mmse_x , mmse_y, P_mmse
 
 class PeopleTrackerFromLegs:
-	def __init__(self, display, pub_persons, use_display):
+	def __init__(self, display, pub_persons, use_display, use_decay_when_nodata):
 		self.use_display = use_display
+		self.use_decay_when_nodata = use_decay_when_nodata
 		self.munkres = Munkres()
 		self.kalman_filters_leg = []
 		self._first_leg = False
@@ -242,7 +244,7 @@ class PeopleTrackerFromLegs:
 						# print 'added new object'
 						# track_new.append(_obj_id)
 						kalman_filters_new.append(createLegKF(frame[i][0], frame[i][1]))
-						track_KF_point_new.append([frame[i][0], frame[i][1]])
+						track_KF_point_new.append([frame[i][0], frame[i][1],0,0])
 						track_KF_new.append(self._obj_id)
 						track_conf_new.append(frame[i][2])
 						self._obj_id = self._obj_id + 1
@@ -310,8 +312,40 @@ class PeopleTrackerFromLegs:
 					self.display.update(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations)
 		else:
 			# print 'Skipping frame %d, empty data, may not real time' % (_frame_idx)
-			if self.use_display:
-				print 'Skipping frame ..., empty data, may not real time'
+			if self.use_decay_when_nodata:
+				if self.use_display:
+					# print 'Skipping frame ..., empty data, may not real time'
+					print 'Decaying all tracks !!, no data'
+				track_KF_new = []
+				track_conf_new = []
+				track_KF_point_new = []
+				kalman_filters_new = []
+				for kf_obji in self.track_KF_leg:
+					_index = self.track_KF_leg.index(kf_obji)
+					_conf = self.track_conf_leg[_index]*DECAY_RATE_LEG
+					if _conf > DECAY_THRES_LEG:
+						kalman_filters_new.append(self.kalman_filters_leg[_index])
+						track_conf_new.append(_conf)
+						# print self.track_KF_leg, self.track_KF_point_leg
+						track_KF_point_new.append([self.track_KF_point_leg[_index][0],self.track_KF_point_leg[_index][1], self.track_KF_point_leg[_index][2] ,self.track_KF_point_leg[_index][3]])
+						track_KF_new.append(kf_obji)
+				self.kalman_filters_leg = kalman_filters_new
+				self.track_KF_leg = track_KF_new
+				self.track_conf_leg = track_conf_new
+				self.track_KF_point_leg = track_KF_point_new
+
+				self.findPeopleTracks()
+				self.processMunkresKalmanPeople()
+				self.publishPersons()
+				if self.use_display:
+					if not self._first_leg:
+						self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations)
+					else:
+						self.display.update(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations)
+			else:
+				if self.use_display:
+					print 'Skipping frame ..., empty data, may not real time'
+
 
 		# _frame_idx = _frame_idx + 1
 
@@ -413,7 +447,10 @@ class PeopleTrackerFromLegs:
 			# twolegs_tracks.append([])
 			self.twolegs_track = []
 			# onelegs_tracks.append([[0, track[0][0], track[0][1]]])
-			self.onelegs_track = [[0, track[0][0], track[0][1], conf[0]]]
+			try:
+				self.onelegs_track = [[0, track[0][0], track[0][1], conf[0]]]
+			except:
+				self.onelegs_track = []
 		if self.use_display:
 				print self.twolegs_track
 				print self.onelegs_track
@@ -732,7 +769,7 @@ def talker():
 	rospy.Subscriber('/legs', LegMeasurementArray, processLegArray)
 	g_pub_ppl = rospy.Publisher('/persons', PersonTrackArray, queue_size = 10)
 	display_tracker= AnimatedScatter()
-	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display)
+	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata)
 	rospy.spin()
 	pass
 
