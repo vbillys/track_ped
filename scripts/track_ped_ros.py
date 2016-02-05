@@ -20,6 +20,7 @@ from CustomCreateKF import createLegKF, createPersonKF, squareMatrix
 g_pub_ppl = None
 g_use_display = True #True #False
 g_use_decay_when_nodata = False #True
+g_use_raw_leg_data = False
 
 COST_MAX_GATING = .8 #1.5 #.7 #1.5 #.7 #1.5
 COST_MAX_GATING_ONELEG = .8 #1.5 #.7 #1.5 #.7 #1.5
@@ -106,9 +107,10 @@ def getMMSEOneLegs(check, onelegs_track, R, KF_point, P):
 	return mmse_x , mmse_y, P_mmse
 
 class PeopleTrackerFromLegs:
-	def __init__(self, display, pub_persons, use_display, use_decay_when_nodata):
+	def __init__(self, display, pub_persons, use_display, use_decay_when_nodata, use_raw_leg_data):
 		self.use_display = use_display
 		self.use_decay_when_nodata = use_decay_when_nodata
+		self.use_raw_leg_data = use_raw_leg_data
 		self.munkres = Munkres()
 		self.kalman_filters_leg = []
 		self._first_leg = False
@@ -140,6 +142,7 @@ class PeopleTrackerFromLegs:
 
 		# for frame in points:
 		frame = points
+		self.points = points
 		# munkres = Munkres()
 		# print frame
 		if len(frame)>0:
@@ -357,8 +360,13 @@ class PeopleTrackerFromLegs:
 		# people_tracks = []
 		# twolegs_tracks = []
 		# onelegs_tracks = []
-		track = self.track_KF_point_leg
-		conf  = self.track_conf_leg
+
+		if self.use_raw_leg_data:
+			track = self.points
+			conf = [c[2] for c in track]
+		else:
+			track = self.track_KF_point_leg
+			conf  = self.track_conf_leg
 		# for track, conf in zip (leg_tracks, leg_confs):
 		if len(track) > 1:
 			leg_dists = []
@@ -451,9 +459,9 @@ class PeopleTrackerFromLegs:
 				self.onelegs_track = [[0, track[0][0], track[0][1], conf[0]]]
 			except:
 				self.onelegs_track = []
-		if self.use_display:
-				print self.twolegs_track
-				print self.onelegs_track
+		# if self.use_display:
+				# print self.twolegs_track
+				# print self.onelegs_track
 		# return twolegs_tracks, onelegs_tracks
 
 	def processMunkresKalmanPeople(self):
@@ -526,10 +534,12 @@ class PeopleTrackerFromLegs:
 				V = np.array([[self.kalman_filters_people[_lidx].P[0,0],self.kalman_filters_people[_lidx].P[0,3]],[self.kalman_filters_people[_lidx].P[3,0],self.kalman_filters_people[_lidx].P[3,3]]])
 				V = V + np.array([[RMAHALANOBIS,0],[0,RMAHALANOBIS]])
 				for leg in twolegs_track:
+					# _edist = math.hypot(self.track_KF_point_people[_lidx][0] - leg[6],self.track_KF_point_people[_lidx][1] - leg[7])
 					_mdist = mahalanobis(np.array([self.track_KF_point_people[_lidx][0], self.track_KF_point_people[_lidx][1]]),
 							np.array([leg[6],leg[7]]),
 							np.linalg.inv(V))
 					cost_matrix[-1].append(_mdist)
+					# cost_matrix[-1].append(_edist)
 				_lidx = _lidx + 1
 
 			track_KF_new = []
@@ -560,6 +570,7 @@ class PeopleTrackerFromLegs:
 					track_KF_confirmations_new.append(False)
 					self._people_id = self._people_id + 1
 				else:
+					print 'updated...'
 					kalman_filters_new.append(self.kalman_filters_people[rows[columns.index(i)]])
 					self.kalman_filters_people[rows[columns.index(i)]].update([twolegs_track[i][6], twolegs_track[i][7]]) 
 
@@ -585,6 +596,7 @@ class PeopleTrackerFromLegs:
 					_index = self.track_KF_people.index(kf_obji)
 					_check = isThereAnyOneLegAround(self.track_KF_point_people[_index],self.kalman_filters_people[_index], onelegs_track)
 					if _check[0]:
+						print 'looking for one leg attachment:', _check[0]
 						_gated_len = len(_check[0])
 						# print _check, _check[0]
 						# print onelegs_track
@@ -769,7 +781,7 @@ def talker():
 	rospy.Subscriber('/legs', LegMeasurementArray, processLegArray)
 	g_pub_ppl = rospy.Publisher('/persons', PersonTrackArray, queue_size = 10)
 	display_tracker= AnimatedScatter()
-	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata)
+	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data)
 	rospy.spin()
 	pass
 
