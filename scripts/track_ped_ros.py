@@ -611,7 +611,9 @@ class PeopleTrackerFromLegs:
 							self.kalman_filters_people[_index].R = _R
 							kalman_filters_new.append(self.kalman_filters_people[_index])
 							track_conf_new.append(_conf)
-							track_KF_point_new.append([self.track_KF_point_people[_index][0],self.track_KF_point_people[_index][1]
+							_x_updated = self.kalman_filters_people[_index].x
+							track_KF_point_new.append([_x_updated[0],_x_updated[3]
+							# track_KF_point_new.append([self.track_KF_point_people[_index][0],self.track_KF_point_people[_index][1]
 								,self.track_KF_point_people[_index][2]
 								,self.track_KF_point_people[_index][3]
 								,self.track_KF_point_people[_index][4]
@@ -693,7 +695,7 @@ def createIds(xx, yy, ids, cfms, ax):
 class AnimatedScatter:
 	def __init__(self):
 		self.fig, self.ax = plt.subplots()
-		self.ax.axis([0, 4, -10, 10])
+		self.ax.axis([0, 6, -10, 10])
 		self.ax.hold(True)
 		# plt.axis([0, 4, -10, 10])
 		plt.ion()
@@ -742,7 +744,7 @@ class AnimatedScatter:
 		# plt.draw()
 
 CLIP_Y_MIN = 0 #1. #0.5
-CLIP_Y_MAX = 4 #3.5
+CLIP_Y_MAX = 6 #3.5
 CLIP_X_ABS =10 
 def clipPoints(frame, abs_max_x, max_y):
 	clipped_points = []

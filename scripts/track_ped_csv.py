@@ -19,10 +19,11 @@ import matplotlib.animation as animation
 
 # f_handle = open('ped_data.csv','r')
 # f_handle = open('ped_data_2.csv','r')
-# f_handle = open('ped_data_3.csv','r')
+f_handle = open('ped_data_3.csv','r')
 # f_handle = open('ped_data_4.csv','r')
 # f_handle = open('ped_data_5.csv','r')
-f_handle = open('ped_data_6.csv','r')
+# f_handle = open('ped_data_6.csv','r')
+# f_handle = open('ped_data_7sim.csv','r')
 
 
 
@@ -43,8 +44,8 @@ class AnimatedScatter(object):
 		# self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.coolwarm, s=128)
 		self.scat = self.ax.scatter(x, y, c=c, animated=True, cmap=plt.cm.PuOr, s=128)
 		# self.ax.axis([0, 6, -5, 5])
-		self.ax.axis([0, 10, -10, 10])
-		self.ax.axis([0, 4, -10, 10])
+		# self.ax.axis([0, 10, -10, 10])
+		self.ax.axis([0, 6, -10, 10])
 		if len(ct) > 0:
 			self.scat2 = self.ax.scatter(xkf, ykf, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
 			texts = []
@@ -253,28 +254,38 @@ def animatePoints(data, tracks_munkres, max_obj_id, KF_points, twolegs_tracks, o
 			_i = 0
 			# print _idx
 			# print tracks_people
-			if people_KF_points[_idx]:
-				for _pp in tracks_people[_idx]:
-					# print tracks_people[_idx]
-					# print _pp
-					# print len(tracks_people[_idx]), len(people_KF_points[_idx])
-					# print people_KF_points[_idx]
-					# cst.append(colors_tracks[tracks_munkres[_idx][_i]])
-					xskf_people.append(people_KF_points[_idx][_i][0])
-					yskf_people.append(people_KF_points[_idx][_i][1])
-					people_id.append(tracks_people[_idx][_i])
-					people_confirm.append(tracks_confirms[_idx][_i])
-					_i = _i + 1
+			# print _idx
+			try:
+				if people_KF_points[_idx]:
+					for _pp in tracks_people[_idx]:
+						# print tracks_people[_idx]
+						# print _pp
+						# print len(tracks_people[_idx]), len(people_KF_points[_idx])
+						# print people_KF_points[_idx]
+						# cst.append(colors_tracks[tracks_munkres[_idx][_i]])
+						xskf_people.append(people_KF_points[_idx][_i][0])
+						yskf_people.append(people_KF_points[_idx][_i][1])
+						people_id.append(tracks_people[_idx][_i])
+						people_confirm.append(tracks_confirms[_idx][_i])
+						_i = _i + 1
+			except:
+				pass
 
-			for _pp in twolegs_tracks[_idx]:
-				# print _pp
-				twoleg_xs.append(_pp[6])
-				twoleg_ys.append(_pp[7])
-			for _pp in onelegs_tracks[_idx]:
-				# if _pp:
-				# print _pp
-				oneleg_xs.append(_pp[1])
-				oneleg_ys.append(_pp[2])
+			try:
+				for _pp in twolegs_tracks[_idx]:
+					# print _pp
+					twoleg_xs.append(_pp[6])
+					twoleg_ys.append(_pp[7])
+			except:
+				pass
+			try:
+				for _pp in onelegs_tracks[_idx]:
+					# if _pp:
+					# print _pp
+					oneleg_xs.append(_pp[1])
+					oneleg_ys.append(_pp[2])
+			except:
+				pass
 
 			# points_timed[-1] = (xs, ys, cs, cst, obj_id, xskf, yskf)
 			# points_timed[-1] = (xs, ys, cs, cst, obj_id, xskf, yskf, twoleg_xs, twoleg_ys, oneleg_xs, oneleg_ys)
@@ -594,7 +605,8 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 							kalman_filters[_index].R = _R
 							kalman_filters_new.append(kalman_filters[_index])
 							track_conf_new.append(_conf)
-							track_KF_point_new.append([track_KF_point[_index][0],track_KF_point[_index][1]
+							_x_updated = kalman_filters[_index].x
+							track_KF_point_new.append([_x_updated[0],_x_updated[3]
 								,track_KF_point[_index][2]
 								,track_KF_point[_index][3]
 								,track_KF_point[_index][4]
@@ -638,7 +650,7 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 	return tracks_KF, _person_id-1, tracks_KF_points, tracks_conf, tracks_KF_confirmations
 
 CLIP_Y_MIN = 0 #1. #0.5
-CLIP_Y_MAX = 4 #3.5
+CLIP_Y_MAX = 6 #3.5
 CLIP_X_ABS =10 
 def clipPoints(points, abs_max_x, max_y):
 	clipped_points = []
@@ -826,11 +838,25 @@ def processMunkresKalman(points):
 	return tracks, _obj_id-1, tracks_KF_points, tracks_conf
 	pass
 
-def findPeopleTracks(leg_tracks, leg_confs):
+def findPeopleTracks(leg_tracks, leg_confs, points):
 	# people_tracks = []
 	twolegs_tracks = []
 	onelegs_tracks = []
-	for track, conf in zip (leg_tracks, leg_confs):
+	leg_tracks_ = leg_tracks
+	leg_confs_ = leg_confs
+	# leg_tracks_ = []
+	# leg_confs_ = []
+	# for track in points:
+		# if len(track) > 1:
+			# leg_tracks_.append([])
+			# leg_confs_.append([])
+			# for ttrack in track:
+				# leg_tracks_[-1].append(ttrack[0:2])
+				# leg_confs_[-1].append(ttrack[2])
+	# print leg_tracks_
+	# print leg_confs_
+		
+	for track, conf in zip (leg_tracks_, leg_confs_):
 		if len(track) > 1:
 			leg_dists = []
 			uniqueness = [0]*(len(track))
@@ -909,6 +935,7 @@ def findPeopleTracks(leg_tracks, leg_confs):
 			onelegs_tracks.append(onelegs_track)
 
 		else:
+			# print track
 			# no pairing possible
 			# people_tracks.append([])
 			twolegs_tracks.append([])
@@ -940,7 +967,7 @@ for str_ in f_content:
 t_start = time.time()
 points = clipPoints(points, CLIP_X_ABS , CLIP_Y_MAX)
 tracks_munkres , max_obj_id , tracks_KF_points, tracks_conf= processMunkresKalman(points)
-people_2legs_tracks, people_1leg_tracks = findPeopleTracks(tracks_KF_points, tracks_conf)
+people_2legs_tracks, people_1leg_tracks = findPeopleTracks(tracks_KF_points, tracks_conf, points)
 tracks_KF_people, max_people_id, tracks_KF_people_pp, tracks_people_conf, tracks_confirms = processMunkresKalmanPeople(people_2legs_tracks, people_1leg_tracks)
 t_end = time.time()
 print (-t_start + t_end) , len(points), (-t_start + t_end) / len(points)
