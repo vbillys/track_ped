@@ -24,6 +24,8 @@ COST_MAX_GATING = .8 #1.5 #.7 #1.5 #.7 #1.5
 COST_MAX_GATING_ONELEG = .8 #1.5 #.7 #1.5 #.7 #1.5
 DECAY_RATE = 0.93
 DECAY_THRES = 0.3
+DECAY_RATE_LEG = 0.8 #93
+DECAY_THRES_LEG = .5 #0.3
 IMPROVE_RATE = 0.05
 PERSON_CONFIRM_THRES = 0.5
 RMAHALANOBIS = 2. #.5 #2.5 #2.5
@@ -262,7 +264,7 @@ class PeopleTrackerFromLegs:
 						track_KF_point_new.append([_x_updated[0], _x_updated[2],_x_updated[1], _x_updated[3]])
 
 						track_KF_new.append(self.track_KF_leg[rows[columns.index(i)]])
-						track_conf_new.append(self.track_conf_leg[rows[columns.index(i)]]*DECAY_RATE + frame[i][2]*(1-DECAY_RATE))
+						track_conf_new.append(self.track_conf_leg[rows[columns.index(i)]]*DECAY_RATE_LEG + frame[i][2]*(1-DECAY_RATE_LEG))
 
 				# # Maintain unassinged KF tracks
 				# if len(rows) < len(track_KF):
@@ -271,8 +273,8 @@ class PeopleTrackerFromLegs:
 				for kf_obji in self.track_KF_leg:
 					if kf_obji not in track_KF_new:
 						_index = self.track_KF_leg.index(kf_obji)
-						_conf = self.track_conf_leg[_index]*DECAY_RATE
-						if _conf > DECAY_THRES:
+						_conf = self.track_conf_leg[_index]*DECAY_RATE_LEG
+						if _conf > DECAY_THRES_LEG:
 							# print 'maintaining', kf_obji
 							kalman_filters_new.append(self.kalman_filters_leg[_index])
 							track_conf_new.append(_conf)
