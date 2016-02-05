@@ -2,6 +2,7 @@
 import itertools
 from munkres import Munkres
 from scipy.spatial.distance import mahalanobis
+from scipy.stats import multivariate_normal
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise, dot3
 # import book_format
@@ -379,25 +380,34 @@ DECAY_THRES = 0.3
 IMPROVE_RATE = 0.05
 PERSON_CONFIRM_THRES = 0.5
 RMAHALANOBIS = 2. #.5 #2.5 #2.5
-MAX_DIST_PERSON_ONELEG = .3
-PERSON_GATING_DISTANCE = 0.8
+MAX_DIST_PERSON_ONELEG = 1. #.1 #.5 #1. #.3
+PERSON_GATING_DISTANCE = .8 #.6 #0.8
 
 def getVMatrixCAModel(k_filter):
 	V = np.array([[k_filter.P[0,0],k_filter.P[0,3]],[k_filter.P[3,0],k_filter.P[3,3]]])
-	V = V + np.array([[RMAHALANOBIS,0],[0,RMAHALANOBIS]])
+	# V = V + np.array([[RMAHALANOBIS,0],[0,RMAHALANOBIS]])
 	return V
+
+def getPosPMatrixCAModel(k_filter):
+	# return np.array([[k_filter.P[0,0],k_filter.P[0,3]],[k_filter.P[3,0],k_filter.P[3,3]]]) + np.array([[RMAHALANOBIS,0],[0,RMAHALANOBIS]])
+	return np.array([[k_filter.P[0,0],k_filter.P[0,3]],[k_filter.P[3,0],k_filter.P[3,3]]])
 
 def calcMahalanobisDistance(first_p, second_p, V):
 	return mahalanobis (np.array([first_p[0], first_p[1]]), np.array([second_p[0], second_p[1]]), np.linalg.inv(V))
 
 def isThereAnyOneLegAround(KF_point,k_filter, onelegs_track):
-	V = getVMatrixCAModel(k_filter)
 
 	index = 0
 	indexes = []
 	mdists = []
 	edists = []
 	ratio_dists = []
+	weights = []
+	# var = multivariate_normal(mean=[KF_point[0],KF_point[1]], cov=getPosPMatrixCAModel(k_filter))
+	var = multivariate_normal(mean=[KF_point[0],KF_point[1]], cov=np.array([[RMAHALANOBIS,0],[0,RMAHALANOBIS]]))
+	var0= var.pdf([KF_point[0],KF_point[1]])
+	V = getVMatrixCAModel(k_filter)
+
 	for oneleg in onelegs_track:
 		_mdist = mahalanobis(np.array([oneleg[1], oneleg[2]]),
 				np.array([KF_point[0],KF_point[1]]),
@@ -409,28 +419,38 @@ def isThereAnyOneLegAround(KF_point,k_filter, onelegs_track):
 			mdists.append(_mdist)
 			edists.append(_edist)
 			ratio_dists.append(_mdist/_edist)
+			weights.append(var.pdf([oneleg[1], oneleg[2]]))
 		index = index + 1
 	# indexes = []
-	return  indexes, mdists, edists, ratio_dists, sum(ratio_dists)
+	return  indexes, mdists, edists, ratio_dists, sum(ratio_dists), weights, sum(weights)+var0, var0
 
 # mx, my = getMMSEOneLegs(_check, onelegs_track)
-def getMMSEOneLegs(check, onelegs_track, R, KF_point):
+def getMMSEOneLegs(check, onelegs_track, R, KF_point, P):
 	_noidx = 0
 	mmse_x = 0
 	mmse_y = 0
 	P_mmse = np.array([[0,0],[0,0]])
+	# print 'check:', check
 	for index in check[0]:
-		_ratio = check[3][_noidx]/check[4]
+		# _ratio = check[3][_noidx]/check[4]
+		_ratio = check[5][_noidx]/check[6]
 		mmse_x = mmse_x + (onelegs_track[index][1]-KF_point[0])*_ratio
 		mmse_y = mmse_y + (onelegs_track[index][2]-KF_point[1])*_ratio
 		_noidx = _noidx + 1
+	mmse_x = mmse_x + KF_point[0]
+	mmse_y = mmse_y + KF_point[1]
 	_noidx = 0
 	for index in check[0]:
-		_ratio = check[3][_noidx]/check[4]
+		# _ratio = check[3][_noidx]/check[4]
+		_ratio = check[5][_noidx]/check[6]
 		_delta_x = onelegs_track[index][1] - mmse_x
 		_delta_y = onelegs_track[index][2] - mmse_y
 		P_mmse = P_mmse + (R + np.array([_delta_x,_delta_y])*np.array([[_delta_x],[_delta_y]]))*_ratio
 		_noidx = _noidx + 1
+	# P_mmse = P_mmse + P*check[7] #+ np.array([[3,0],[0,3]])
+	P_mmse = P_mmse + R*check[7] #+ np.array([[3,0],[0,3]])
+	# print 'P-mmse:', P_mmse
+
 
 	return mmse_x , mmse_y, P_mmse
 
@@ -566,7 +586,7 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 						_conf = track_conf[_index]*DECAY_RATE + (_gated_sum_conf/_gated_len)*(1-DECAY_RATE)
 						if _conf > DECAY_THRES:
 							_R = kalman_filters[_index].R
-							mx, my, RR = getMMSEOneLegs(_check, onelegs_track, _R, track_KF_point[_index])
+							mx, my, RR = getMMSEOneLegs(_check, onelegs_track, _R, track_KF_point[_index], getPosPMatrixCAModel(kalman_filters[_index]))
 							kalman_filters[_index].R = RR
 							kalman_filters[_index].update([mx, my])
 							kalman_filters[_index].R = _R
