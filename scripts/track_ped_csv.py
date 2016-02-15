@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import itertools
+from collections import OrderedDict
 from munkres import Munkres
 from scipy.spatial.distance import mahalanobis
 from scipy.stats import multivariate_normal
@@ -19,11 +20,12 @@ import matplotlib.animation as animation
 
 # f_handle = open('ped_data.csv','r')
 # f_handle = open('ped_data_2.csv','r')
-f_handle = open('ped_data_3.csv','r')
+# f_handle = open('ped_data_3.csv','r')
 # f_handle = open('ped_data_4.csv','r')
 # f_handle = open('ped_data_5.csv','r')
 # f_handle = open('ped_data_6.csv','r')
 # f_handle = open('ped_data_7sim.csv','r')
+f_handle = open('ped_data_8sim.csv','r')
 
 
 
@@ -395,6 +397,7 @@ PERSON_CONFIRM_THRES = 0.5
 RMAHALANOBIS = 2. #.5 #2.5 #2.5
 MAX_DIST_PERSON_ONELEG = 1. #.1 #.5 #1. #.3
 PERSON_GATING_DISTANCE = .8 #.6 #0.8
+MAX_DIST_OWNERSHIP_ONELEG = .5
 
 def getVMatrixCAModel(k_filter):
 	V = np.array([[k_filter.P[0,0],k_filter.P[0,3]],[k_filter.P[3,0],k_filter.P[3,3]]])
@@ -408,7 +411,7 @@ def getPosPMatrixCAModel(k_filter):
 def calcMahalanobisDistance(first_p, second_p, V):
 	return mahalanobis (np.array([first_p[0], first_p[1]]), np.array([second_p[0], second_p[1]]), np.linalg.inv(V))
 
-def isThereAnyOneLegAround(KF_point,k_filter, onelegs_track):
+def isThereAnyOneLegAround(KF_point,k_filter, onelegs_track, onelegs_track_owned_index, onelegs_track_owning_person_index, person_index):
 
 	index = 0
 	indexes = []
@@ -416,6 +419,7 @@ def isThereAnyOneLegAround(KF_point,k_filter, onelegs_track):
 	edists = []
 	ratio_dists = []
 	weights = []
+	no_decay = False
 	# var = multivariate_normal(mean=[KF_point[0],KF_point[1]], cov=getPosPMatrixCAModel(k_filter))
 	var = multivariate_normal(mean=[KF_point[0],KF_point[1]], cov=np.array([[RMAHALANOBIS,0],[0,RMAHALANOBIS]]))
 	var0= var.pdf([KF_point[0],KF_point[1]])
@@ -428,14 +432,21 @@ def isThereAnyOneLegAround(KF_point,k_filter, onelegs_track):
 		_edist = math.hypot(oneleg[1] - KF_point[0], oneleg[2] - KF_point[1])
 		# if _mdist < COST_MAX_GATING_ONELEG:
 		if _edist < MAX_DIST_PERSON_ONELEG:
-			indexes.append(index)
-			mdists.append(_mdist)
-			edists.append(_edist)
-			ratio_dists.append(_mdist/_edist)
-			weights.append(var.pdf([oneleg[1], oneleg[2]]))
+			no_decay = True
+			index_is_the_person = False
+			if index in onelegs_track_owned_index:
+				if person_index == onelegs_track_owning_person_index[onelegs_track_owned_index.index(index)]:
+					index_is_the_person = True
+
+			if index_is_the_person or index not in onelegs_track_owned_index:
+				indexes.append(index)
+				mdists.append(_mdist)
+				edists.append(_edist)
+				ratio_dists.append(_mdist/_edist)
+				weights.append(var.pdf([oneleg[1], oneleg[2]]))
 		index = index + 1
 	# indexes = []
-	return  indexes, mdists, edists, ratio_dists, sum(ratio_dists), weights, sum(weights)+var0, var0
+	return  indexes, mdists, edists, ratio_dists, sum(ratio_dists), weights, sum(weights)+var0, var0, no_decay
 
 # mx, my = getMMSEOneLegs(_check, onelegs_track)
 def getMMSEOneLegs(check, onelegs_track, R, KF_point, P):
@@ -466,6 +477,23 @@ def getMMSEOneLegs(check, onelegs_track, R, KF_point, P):
 
 
 	return mmse_x , mmse_y, P_mmse
+
+def findMinIndexFromOnelegsTrack(_xx , _yy, onelegs_track, thres):
+	dist = []
+	# mindist = []
+	oneleg_index = []
+	i = 0
+	for oneleg in onelegs_track:
+		_dist = math.hypot(_xx - oneleg[1], _yy - oneleg[2])
+		if _dist < thres:
+			dist.append(_dist)
+			# mindist.append(mindist)
+			oneleg_index.append(i)
+		i = i + 1
+	if dist:
+		return oneleg_index[dist.index(min(dist))]
+	else:
+		return None
 
 def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 	kalman_filters = []
@@ -535,10 +563,12 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 				V = np.array([[kalman_filters[_lidx].P[0,0],kalman_filters[_lidx].P[0,3]],[kalman_filters[_lidx].P[3,0],kalman_filters[_lidx].P[3,3]]])
 				V = V + np.array([[RMAHALANOBIS,0],[0,RMAHALANOBIS]])
 				for leg in twolegs_track:
-					_mdist = mahalanobis(np.array([track_KF_point[_lidx][0], track_KF_point[_lidx][1]]),
-							np.array([leg[6],leg[7]]),
-							np.linalg.inv(V))
-					cost_matrix[-1].append(_mdist)
+					_dist = math.hypot(track_KF_point[_lidx][0] - leg[6], track_KF_point[_lidx][1] - leg[7])
+					# _mdist = mahalanobis(np.array([track_KF_point[_lidx][0], track_KF_point[_lidx][1]]),
+							# np.array([leg[6],leg[7]]),
+							# np.linalg.inv(V))
+					# cost_matrix[-1].append(_mdist)
+					cost_matrix[-1].append(_dist)
 				_lidx = _lidx + 1
 
 			track_KF_new = []
@@ -587,26 +617,64 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 					else:
 						track_KF_confirmations_new.append(False)
 
+
+			onelegs_track_owned_index = []
+			onelegs_track_owning_person_index = []
+			_index_kf_obji = 0
 			for kf_obji in track_KF:
 				if kf_obji not in track_KF_new:
 					_index = track_KF.index(kf_obji)
-					_check = isThereAnyOneLegAround(track_KF_point[_index],kalman_filters[_index], onelegs_track)
-					if _check[0]:
+					_xx = track_KF_point[_index][0]
+					_yy = track_KF_point[_index][1]
+
+					_index_mindist = findMinIndexFromOnelegsTrack(_xx , _yy, onelegs_track, MAX_DIST_OWNERSHIP_ONELEG)
+					# for one1leg in onelegs_track:
+					# _dist = math.hypot(_xx - one1leg[0], _yy - one1leg[1])
+					if _index_mindist is not None:
+						onelegs_track_owned_index.append(_index_mindist)
+						onelegs_track_owning_person_index.append(_index_kf_obji)
+					# else:
+						# onelegs_track_owned_index.append(None)
+						# onelegs_track_owning_person_index.append(0)
+				_index_kf_obji = _index_kf_obji + 1
+			# onelegs_track_owned_index = list(OrderedDict.fromkeys(onelegs_track_owned_index))
+
+
+			for kf_obji in track_KF:
+				if kf_obji not in track_KF_new:
+					_index = track_KF.index(kf_obji)
+					_check = isThereAnyOneLegAround(track_KF_point[_index],kalman_filters[_index], onelegs_track, onelegs_track_owned_index, onelegs_track_owning_person_index, _index)
+					if _check[0] or _check[8]:
 						_gated_len = len(_check[0])
 						print _check, _check[0]
 						print onelegs_track
-						_gated_sum_conf = sum([onelegs_track[s][3] for s in _check[0]])
-						_conf = track_conf[_index]*DECAY_RATE + (_gated_sum_conf/_gated_len)*(1-DECAY_RATE)
-						if _conf > DECAY_THRES:
-							_R = kalman_filters[_index].R
-							mx, my, RR = getMMSEOneLegs(_check, onelegs_track, _R, track_KF_point[_index], getPosPMatrixCAModel(kalman_filters[_index]))
-							kalman_filters[_index].R = RR
-							kalman_filters[_index].update([mx, my])
-							kalman_filters[_index].R = _R
+						# if not _check[8]:
+						if _check[0]:
+							_gated_sum_conf = sum([onelegs_track[s][3] for s in _check[0]])
+							_conf = track_conf[_index]*DECAY_RATE + (_gated_sum_conf/_gated_len)*(1-DECAY_RATE)
+							if _conf > DECAY_THRES:
+								_R = kalman_filters[_index].R
+								mx, my, RR = getMMSEOneLegs(_check, onelegs_track, _R, track_KF_point[_index], getPosPMatrixCAModel(kalman_filters[_index]))
+								kalman_filters[_index].R = RR
+								kalman_filters[_index].update([mx, my])
+								kalman_filters[_index].R = _R
+								kalman_filters_new.append(kalman_filters[_index])
+								track_conf_new.append(_conf)
+								_x_updated = kalman_filters[_index].x
+								track_KF_point_new.append([_x_updated[0],_x_updated[3]
+									,track_KF_point[_index][2]
+									,track_KF_point[_index][3]
+									,track_KF_point[_index][4]
+									,track_KF_point[_index][5]
+									]) #, track_KF_point[_index][2] ,track_KF_point[_index][3]])
+								track_KF_new.append(kf_obji)
+								track_KF_improvements_new.append(track_KF_improvements[_index])
+								track_KF_confirmations_new.append(track_KF_confirmations[_index])
+						else:
+							# _conf = track_conf[_index] #*DECAY_RATE
 							kalman_filters_new.append(kalman_filters[_index])
-							track_conf_new.append(_conf)
-							_x_updated = kalman_filters[_index].x
-							track_KF_point_new.append([_x_updated[0],_x_updated[3]
+							track_conf_new.append(track_conf[_index])
+							track_KF_point_new.append([track_KF_point[_index][0],track_KF_point[_index][1]
 								,track_KF_point[_index][2]
 								,track_KF_point[_index][3]
 								,track_KF_point[_index][4]
