@@ -21,6 +21,7 @@ g_pub_ppl = None
 g_use_display = True #True #False
 g_use_decay_when_nodata =False # True #False #True
 g_use_raw_leg_data = False
+g_no_ppl_predict_when_update_fail = True
 
 COST_MAX_GATING = .8 #1.5 #.7 #1.5 #.7 #1.5
 COST_MAX_GATING_ONELEG = .8 #1.5 #.7 #1.5 #.7 #1.5
@@ -134,9 +135,10 @@ def getMMSEOneLegs(check, onelegs_track, R, KF_point, P):
 	return mmse_x , mmse_y, P_mmse
 
 class PeopleTrackerFromLegs:
-	def __init__(self, display, pub_persons, use_display, use_decay_when_nodata, use_raw_leg_data):
+	def __init__(self, display, pub_persons, use_display, use_decay_when_nodata, use_raw_leg_data, no_ppl_predict_when_update_fail):
 		self.use_display = use_display
 		self.use_decay_when_nodata = use_decay_when_nodata
+		self.no_ppl_predict_when_update_fail = no_ppl_predict_when_update_fail
 		self.use_raw_leg_data = use_raw_leg_data
 		self.munkres = Munkres()
 		self.kalman_filters_leg = []
@@ -539,7 +541,11 @@ class PeopleTrackerFromLegs:
 			track_KF_point_new = []
 			_kidx = 0
 			for kf in self.kalman_filters_people:
-				kf.predict()
+				if self.no_ppl_predict_when_update_fail:
+					if self.track_KF_onelegmode[_kidx] < 2:
+						kf.predict()
+				else:
+					kf.predict()
 				_x_updated = kf.x
 				track_KF_point_new.append([_x_updated[0], _x_updated[3], self.track_KF_point_people[_kidx][2]
 					,self.track_KF_point_people[_kidx][3]
@@ -876,7 +882,7 @@ def talker():
 	rospy.Subscriber('/legs', LegMeasurementArray, processLegArray)
 	g_pub_ppl = rospy.Publisher('/persons', PersonTrackArray, queue_size = 10)
 	display_tracker= AnimatedScatter()
-	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data)
+	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail)
 	rospy.spin()
 	pass
 

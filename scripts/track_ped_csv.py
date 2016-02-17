@@ -30,6 +30,7 @@ f_handle = open('ped_data_8sim.csv','r')
 
 fw_handle = open('processed_data_8sim.csv','w')
 g_is_write_to_file = True
+g_no_ppl_predict_when_update_fail = True
 
 
 class AnimatedScatter(object):
@@ -573,7 +574,11 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks, fw_handle, is_wri
 			track_KF_point_new = []
 			_kidx = 0
 			for kf in kalman_filters:
-				kf.predict()
+				if g_no_ppl_predict_when_update_fail:
+					if track_KF_onelegmode[_kidx] < 2:
+						kf.predict()
+				else:
+					kf.predict()
 				_x_updated = kf.x
 				track_KF_point_new.append([_x_updated[0], _x_updated[3], track_KF_point[_kidx][2]
 					,track_KF_point[_kidx][3]
