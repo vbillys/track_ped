@@ -4,6 +4,7 @@ from collections import OrderedDict
 from munkres import Munkres
 from scipy.spatial.distance import mahalanobis
 from scipy.stats import multivariate_normal
+from scipy.optimize import fmin_cg
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise, dot3
 # import book_format
@@ -27,7 +28,8 @@ import matplotlib.animation as animation
 # f_handle = open('ped_data_7sim.csv','r')
 f_handle = open('ped_data_8sim.csv','r')
 
-
+fw_handle = open('processed_data_8sim.csv','w')
+g_is_write_to_file = True
 
 
 class AnimatedScatter(object):
@@ -495,7 +497,26 @@ def findMinIndexFromOnelegsTrack(_xx , _yy, onelegs_track, thres):
 	else:
 		return None
 
-def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
+
+def writeResultToFile(fw_handle, tracks_KF, tracks_conf, tracks_KF_points):
+	_ii_index = 0
+	for track_KF in tracks_KF:
+		if len(track_KF) > 0:
+			_index = 0
+			str_ = ''
+			for track in track_KF:
+				str_= str_  + format(tracks_conf[_ii_index][_index],'.3f')+ ' '
+				str_= str_  + format(track,'d')+ ' '
+				str_= str_  + format(tracks_KF_points[_ii_index][_index][0],'.3f')+ ' '
+				str_= str_  + format(tracks_KF_points[_ii_index][_index][1],'.3f')+ ' '
+
+				_index = _index + 1
+
+			str_ = str_ + '\n'
+			fw_handle.write(str_)
+		_ii_index = _ii_index + 1
+
+def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks, fw_handle, is_write_to_file):
 	kalman_filters = []
 	munkres = Munkres()
 	_first = False
@@ -526,6 +547,7 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 					track_KF_point.append([twoleg[6],twoleg[7], twoleg[2] , twoleg[3], twoleg[4], twoleg[5]])
 					track_KF_improvements.append(twoleg[8]*IMPROVE_RATE)
 					track_KF_confirmations.append(False)
+
 
 			# else:
 			tracks_KF.append(track_KF)
@@ -653,6 +675,8 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 							_gated_sum_conf = sum([onelegs_track[s][3] for s in _check[0]])
 							_conf = track_conf[_index]*DECAY_RATE + (_gated_sum_conf/_gated_len)*(1-DECAY_RATE)
 							if _conf > DECAY_THRES:
+								if kf_obji == 1:
+									print 'object 1 found at least 1 onelegs averaging and go...'
 								_R = kalman_filters[_index].R
 								mx, my, RR = getMMSEOneLegs(_check, onelegs_track, _R, track_KF_point[_index], getPosPMatrixCAModel(kalman_filters[_index]))
 								kalman_filters[_index].R = RR
@@ -672,6 +696,7 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 								track_KF_confirmations_new.append(track_KF_confirmations[_index])
 						else:
 							# _conf = track_conf[_index] #*DECAY_RATE
+							# kalman_filters[_index].update([track_KF_point[_index][0],track_KF_point[_index][1]])
 							kalman_filters_new.append(kalman_filters[_index])
 							track_conf_new.append(track_conf[_index])
 							track_KF_point_new.append([track_KF_point[_index][0],track_KF_point[_index][1]
@@ -683,6 +708,9 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 							track_KF_new.append(kf_obji)
 							track_KF_improvements_new.append(track_KF_improvements[_index])
 							track_KF_confirmations_new.append(track_KF_confirmations[_index])
+							if kf_obji == 1:
+								print 'object 1 found no (assosiative) oneleg staying...'
+								# print track_KF_point_new
 
 					else:
 						_conf = track_conf[_index]*DECAY_RATE
@@ -698,6 +726,9 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 							track_KF_new.append(kf_obji)
 							track_KF_improvements_new.append(track_KF_improvements[_index])
 							track_KF_confirmations_new.append(track_KF_confirmations[_index])
+							if kf_obji == 1:
+								print 'object 1 found no oneleg decaying...'
+								print track_KF_point_new
 
 
 			kalman_filters = kalman_filters_new
@@ -715,6 +746,8 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks):
 
 		_frame_idx = _frame_idx + 1
 
+	if is_write_to_file:
+		writeResultToFile(fw_handle, tracks_KF, tracks_conf, tracks_KF_points)
 	return tracks_KF, _person_id-1, tracks_KF_points, tracks_conf, tracks_KF_confirmations
 
 CLIP_Y_MIN = 0 #1. #0.5
@@ -1036,9 +1069,10 @@ t_start = time.time()
 points = clipPoints(points, CLIP_X_ABS , CLIP_Y_MAX)
 tracks_munkres , max_obj_id , tracks_KF_points, tracks_conf= processMunkresKalman(points)
 people_2legs_tracks, people_1leg_tracks = findPeopleTracks(tracks_KF_points, tracks_conf, points)
-tracks_KF_people, max_people_id, tracks_KF_people_pp, tracks_people_conf, tracks_confirms = processMunkresKalmanPeople(people_2legs_tracks, people_1leg_tracks)
+tracks_KF_people, max_people_id, tracks_KF_people_pp, tracks_people_conf, tracks_confirms = processMunkresKalmanPeople(people_2legs_tracks, people_1leg_tracks, fw_handle, g_is_write_to_file)
 t_end = time.time()
 print (-t_start + t_end) , len(points), (-t_start + t_end) / len(points)
+fw_handle.close()
 plotPoints(points)
 # print people_2legs_tracks
 # print tracks_KF_people_pp
