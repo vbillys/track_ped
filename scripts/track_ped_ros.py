@@ -19,7 +19,7 @@ from CustomCreateKF import createLegKF, createPersonKF, squareMatrix
 
 g_pub_ppl = None
 g_use_display = True #True #False
-g_use_decay_when_nodata = False #True
+g_use_decay_when_nodata =False # True #False #True
 g_use_raw_leg_data = False
 
 COST_MAX_GATING = .8 #1.5 #.7 #1.5 #.7 #1.5
@@ -161,6 +161,7 @@ class PeopleTrackerFromLegs:
 		self._people_id = 1
 		self.track_KF_confirmations = []
 		self.track_KF_improvements = []
+		self.track_KF_onelegmode = []
 
 		self.pub_persons = pub_persons
 
@@ -337,9 +338,9 @@ class PeopleTrackerFromLegs:
 			self.publishPersons()
 			if self.use_display:
 				if not self._first_leg:
-					self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations)
+					self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations, self.track_KF_onelegmode)
 				else:
-					self.display.update(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations)
+					self.display.update(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations, self.track_KF_onelegmode)
 		else:
 			# print 'Skipping frame %d, empty data, may not real time' % (_frame_idx)
 			if self.use_decay_when_nodata:
@@ -369,9 +370,9 @@ class PeopleTrackerFromLegs:
 				self.publishPersons()
 				if self.use_display:
 					if not self._first_leg:
-						self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations)
+						self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations, self.track_KF_onelegmode)
 					else:
-						self.display.update(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations)
+						self.display.update(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations, self.track_KF_onelegmode)
 			else:
 				if self.use_display:
 					print 'Skipping frame ..., empty data, may not real time'
@@ -509,10 +510,12 @@ class PeopleTrackerFromLegs:
 			track_KF_point = []
 			track_KF_confirmations = []
 			track_KF_improvements = []
+			track_KF_onelegmode = []
 			# _person_id = 1
 			if len(twolegs_track) > 0:
 				self._first_people = True
 				for twoleg in twolegs_track:
+					track_KF_onelegmode.append(0)
 					track_KF.append(self._people_id)
 					self.kalman_filters_people.append(createPersonKF(twoleg[6], twoleg[7]))
 					track_conf.append(twoleg[8])
@@ -530,6 +533,7 @@ class PeopleTrackerFromLegs:
 			self.track_KF_point_people = track_KF_point
 			self.track_KF_improvements = track_KF_improvements
 			self.track_KF_confirmations = track_KF_confirmations
+			self.track_KF_onelegmode = track_KF_onelegmode
 
 		else:
 			track_KF_point_new = []
@@ -543,7 +547,9 @@ class PeopleTrackerFromLegs:
 					,self.track_KF_point_people[_kidx][5]
 					])
 				_kidx = _kidx + 1
-			track_KF_point = track_KF_point_new
+			# track_KF_point = track_KF_point_new # BUGGISH!!!
+			self.track_KF_point_people= track_KF_point_new
+
 			cost_matrix = []
 			_lidx = 0
 
@@ -575,6 +581,7 @@ class PeopleTrackerFromLegs:
 			kalman_filters_new = []
 			track_KF_confirmations_new = []
 			track_KF_improvements_new = []
+			track_KF_onelegmode_new = []
 			rows = []
 			columns = []
 			indexes = []
@@ -595,6 +602,7 @@ class PeopleTrackerFromLegs:
 					track_conf_new.append(twolegs_track[i][8])
 					track_KF_improvements_new.append(twolegs_track[i][8]*IMPROVE_RATE)
 					track_KF_confirmations_new.append(False)
+					track_KF_onelegmode_new.append(0)
 					self._people_id = self._people_id + 1
 				else:
 					print 'updated...'
@@ -612,6 +620,7 @@ class PeopleTrackerFromLegs:
 					track_conf_new.append(self.track_conf_people[rows[columns.index(i)]]*DECAY_RATE + twolegs_track[i][8]*(1-DECAY_RATE))
 					_improve = self.track_KF_improvements[rows[columns.index(i)]] + twolegs_track[i][8]*IMPROVE_RATE
 					track_KF_improvements_new.append(_improve)
+					track_KF_onelegmode_new.append(0)
 					if _improve > PERSON_CONFIRM_THRES:
 						track_KF_confirmations_new.append(True)
 					else:
@@ -654,6 +663,8 @@ class PeopleTrackerFromLegs:
 							_gated_sum_conf = sum([onelegs_track[s][3] for s in _check[0]])
 							_conf = self.track_conf_people[_index]*DECAY_RATE + (_gated_sum_conf/_gated_len)*(1-DECAY_RATE)
 							if _conf > DECAY_THRES:
+								if kf_obji == 1:
+									print 'object 1 found at least 1 onelegs averaging and go...'
 								_R = self.kalman_filters_people[_index].R
 								# mx, my, RR = getMMSEOneLegs(_check, onelegs_track, _R, self.track_KF_point_people[_index])
 								mx, my, RR = getMMSEOneLegs(_check, onelegs_track, _R, self.track_KF_point_people[_index], getPosPMatrixCAModel(self.kalman_filters_people[_index]))
@@ -673,8 +684,10 @@ class PeopleTrackerFromLegs:
 								track_KF_new.append(kf_obji)
 								track_KF_improvements_new.append(self.track_KF_improvements[_index])
 								track_KF_confirmations_new.append(self.track_KF_confirmations[_index])
+								track_KF_onelegmode_new.append(1)
 						else:
 							# _conf = track_conf[_index] #*DECAY_RATE
+							# self.kalman_filters_people[_index].update([self.track_KF_point_people[_index][0],self.track_KF_point_people[_index][1]])
 							kalman_filters_new.append(self.kalman_filters_people[_index])
 							track_conf_new.append(self.track_conf_people[_index])
 							track_KF_point_new.append([self.track_KF_point_people[_index][0],self.track_KF_point_people[_index][1]
@@ -686,6 +699,10 @@ class PeopleTrackerFromLegs:
 							track_KF_new.append(kf_obji)
 							track_KF_improvements_new.append(self.track_KF_improvements[_index])
 							track_KF_confirmations_new.append(self.track_KF_confirmations[_index])
+							track_KF_onelegmode_new.append(2)
+							if kf_obji == 1:
+								print 'object 1 found no (assosiative) oneleg staying...'
+								# print track_KF_point_new
 
 					else:
 						_conf = self.track_conf_people[_index]*DECAY_RATE
@@ -701,6 +718,10 @@ class PeopleTrackerFromLegs:
 							track_KF_new.append(kf_obji)
 							track_KF_improvements_new.append(self.track_conf_people[_index])
 							track_KF_confirmations_new.append(self.track_conf_people[_index])
+							track_KF_onelegmode_new.append(3)
+							if kf_obji == 1:
+								print 'object 1 found no oneleg decaying...'
+								print track_KF_point_new
 
 
 			self.kalman_filters_people= kalman_filters_new
@@ -709,6 +730,7 @@ class PeopleTrackerFromLegs:
 			self.track_KF_point_people= track_KF_point_new
 			self.track_KF_improvements = track_KF_improvements_new
 			self.track_KF_confirmations = track_KF_confirmations_new
+			self.track_KF_onelegmode = track_KF_onelegmode_new
 
 			# tracks_KF.append(track_KF)
 			# tracks_conf.append(track_conf)
@@ -743,14 +765,21 @@ def aggreateCoord(data):
 		ys.append(leg[1])
 	return xs, ys
 
-def createIds(xx, yy, ids, cfms, ax):
+def createIds(xx, yy, ids, cfms, olms, ax):
 	index = 0
 	texts = []
 	for _id in ids:
-		if cfms[index]:
-			text = ax.text(xx[index], yy[index] + 0.3, str(_id), color='red')
-		else:
-			text = ax.text(xx[index], yy[index] + 0.3, str(_id))
+		if olms[index] == 0:
+			if cfms[index]:
+				text = ax.text(xx[index], yy[index] + 0.3, str(_id), color='red')
+			else:
+				text = ax.text(xx[index], yy[index] + 0.3, str(_id))
+		elif olms[index] == 1:
+			text = ax.text(xx[index], yy[index] + 0.3, str(_id), color='green')
+		elif olms[index] == 2:
+			text = ax.text(xx[index], yy[index] + 0.3, str(_id), color='blue')
+		elif olms[index] == 3:
+			text = ax.text(xx[index], yy[index] + 0.3, str(_id), color='yellow')
 		texts.append(text)
 		index = index + 1
 	return texts
@@ -778,12 +807,12 @@ class AnimatedScatter:
 			text.remove()
 		self.texts = []
 
-	def setup_plot(self, data, data_kf, data_pp_ppl, data_kf_ppl, data_kf_ppl_cfm):
+	def setup_plot(self, data, data_kf, data_pp_ppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm):
 		xs, ys = aggreateCoord(data)
 		xskf, yskf = aggreateCoord(data_kf)
 		xskfppl , yskfppl = aggreateCoord(data_pp_ppl)
 		self.removeTexts()
-		self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, self.ax)
+		self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
 		# self.scat = self.ax.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
 		self.scat.set_offsets(np.column_stack((xs, ys)))
 		self.scat2.set_offsets(np.column_stack((xskf, yskf)))
@@ -793,12 +822,12 @@ class AnimatedScatter:
 		self.fig.canvas.draw()
 		# plt.draw()
 
-	def update(self,data, data_kf, data_pp_ppl, data_kf_ppl, data_kf_ppl_cfm):
+	def update(self,data, data_kf, data_pp_ppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm):
 		xs, ys = aggreateCoord(data)
 		xskf, yskf = aggreateCoord(data_kf)
 		xskfppl , yskfppl = aggreateCoord(data_pp_ppl)
 		self.removeTexts()
-		self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, self.ax)
+		self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
 		# plt.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
 		self.scat.set_offsets(np.column_stack((xs, ys)))
 		self.scat2.set_offsets(np.column_stack((xskf, yskf)))
