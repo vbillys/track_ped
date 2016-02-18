@@ -668,9 +668,9 @@ class PeopleTrackerFromLegs:
 				if kf_obji not in track_KF_new:
 					_index = self.track_KF_people.index(kf_obji)
 					_check = isThereAnyOneLegAround(self.track_KF_point_people[_index],self.kalman_filters_people[_index], onelegs_track, onelegs_track_owned_index, onelegs_track_owning_person_index, _index)
-					print _check
+					# print _check
 					if _check[0] or _check[8]:
-						print 'looking for one leg attachment:', _check[0]
+						# print 'looking for one leg attachment:', _check[0]
 						_gated_len = len(_check[0])
 						# print _check, _check[0]
 						# print onelegs_track
@@ -678,8 +678,8 @@ class PeopleTrackerFromLegs:
 							_gated_sum_conf = sum([onelegs_track[s][3] for s in _check[0]])
 							_conf = self.track_conf_people[_index]*DECAY_RATE + (_gated_sum_conf/_gated_len)*(1-DECAY_RATE)
 							if _conf > DECAY_THRES:
-								if kf_obji == 1:
-									print 'object 1 found at least 1 onelegs averaging and go...'
+								# if kf_obji == 1:
+									# print 'object 1 found at least 1 onelegs averaging and go...'
 								_R = self.kalman_filters_people[_index].R
 								# mx, my, RR = getMMSEOneLegs(_check, onelegs_track, _R, self.track_KF_point_people[_index])
 								mx, my, RR = getMMSEOneLegs(_check, onelegs_track, _R, self.track_KF_point_people[_index], getPosPMatrixCAModel(self.kalman_filters_people[_index]))
@@ -715,8 +715,8 @@ class PeopleTrackerFromLegs:
 							track_KF_improvements_new.append(self.track_KF_improvements[_index])
 							track_KF_confirmations_new.append(self.track_KF_confirmations[_index])
 							track_KF_onelegmode_new.append(2)
-							if kf_obji == 1:
-								print 'object 1 found no (assosiative) oneleg staying...'
+							# if kf_obji == 1:
+								# print 'object 1 found no (assosiative) oneleg staying...'
 								# print track_KF_point_new
 
 					else:
