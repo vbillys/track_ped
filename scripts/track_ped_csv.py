@@ -28,10 +28,11 @@ import matplotlib.animation as animation
 # f_handle = open('ped_data_7sim.csv','r')
 f_handle = open('ped_data_8sim.csv','r')
 
+# fw_handle = open('processed_data_5.csv','w')
 fw_handle = open('processed_data_8sim.csv','w')
 g_is_write_to_file = True
-g_no_ppl_predict_when_update_fail = True
-
+g_no_ppl_predict_when_update_fail = False #True
+g_use_limit_ppl_predict = True
 
 class AnimatedScatter(object):
 	def __init__(self, data):
@@ -410,6 +411,7 @@ RMAHALANOBIS = 2. #.5 #2.5 #2.5
 MAX_DIST_PERSON_ONELEG = 1. #.1 #.5 #1. #.3
 PERSON_GATING_DISTANCE = .8 #.6 #0.8
 MAX_DIST_OWNERSHIP_ONELEG = .5
+LIMIT_PPL_PREDICT = .03
 
 def getVMatrixCAModel(k_filter):
 	V = np.array([[k_filter.P[0,0],k_filter.P[0,3]],[k_filter.P[3,0],k_filter.P[3,3]]])
@@ -508,22 +510,49 @@ def findMinIndexFromOnelegsTrack(_xx , _yy, onelegs_track, thres):
 		return None
 
 
-def writeResultToFile(fw_handle, tracks_KF, tracks_conf, tracks_KF_points):
+def writeResultToFile(fw_handle, tracks_KF, tracks_conf, tracks_KF_points, twolegs_tracks, onelegs_tracks, tracks_KF_onelegmode):
 	_ii_index = 0
 	for track_KF in tracks_KF:
-		if len(track_KF) > 0:
-			_index = 0
-			str_ = ''
-			for track in track_KF:
-				str_= str_  + format(tracks_conf[_ii_index][_index],'.3f')+ ' '
-				str_= str_  + format(track,'d')+ ' '
-				str_= str_  + format(tracks_KF_points[_ii_index][_index][0],'.3f')+ ' '
-				str_= str_  + format(tracks_KF_points[_ii_index][_index][1],'.3f')+ ' '
+		# if len(track_KF) > 0:
+		_index = 0
+		str_ = ''
+		for track in track_KF:
+			str_= str_  + format(tracks_conf[_ii_index][_index],'.3f')+ ' '
+			str_= str_  + format(track,'d')+ ' '
+			str_= str_  + format(tracks_KF_points[_ii_index][_index][0],'.3f')+ ' '
+			str_= str_  + format(tracks_KF_points[_ii_index][_index][1],'.3f')+ ' '
+			str_= str_  + format(tracks_KF_onelegmode[_ii_index][_index],'d')+ ' '
 
-				_index = _index + 1
+			_index = _index + 1
+		str_ = str_ + '\n'
+		fw_handle.write(str_)
 
-			str_ = str_ + '\n'
-			fw_handle.write(str_)
+
+		_index = 0
+		str_ = ''
+		for twoleg in twolegs_tracks[_ii_index]:
+			str_= str_  + format(twoleg[8],'.3f')+ ' '
+			# str_= str_  + format(track,'d')+ ' '
+			str_= str_  + format(twoleg[6],'.3f')+ ' '
+			str_= str_  + format(twoleg[7],'.3f')+ ' '
+
+			_index = _index + 1
+		str_ = str_ + '\n'
+		fw_handle.write(str_)
+
+
+		_index = 0
+		str_ = ''
+		for oneleg in onelegs_tracks[_ii_index]:
+			str_= str_  + format(oneleg[3],'.3f')+ ' '
+			# str_= str_  + format(track,'d')+ ' '
+			str_= str_  + format(oneleg[1],'.3f')+ ' '
+			str_= str_  + format(oneleg[2],'.3f')+ ' '
+
+			_index = _index + 1
+		str_ = str_ + '\n'
+		fw_handle.write(str_)
+
 		_ii_index = _ii_index + 1
 
 def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks, fw_handle, is_write_to_file):
@@ -574,12 +603,18 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks, fw_handle, is_wri
 			track_KF_point_new = []
 			_kidx = 0
 			for kf in kalman_filters:
+				_x_bef_updated = kf.x
 				if g_no_ppl_predict_when_update_fail:
 					if track_KF_onelegmode[_kidx] < 2:
 						kf.predict()
 				else:
 					kf.predict()
 				_x_updated = kf.x
+				if g_use_limit_ppl_predict:
+					_vector_norm = math.hypot(_x_updated[0]-_x_bef_updated[0], _x_updated[3]-_x_bef_updated[3])
+					if _vector_norm > LIMIT_PPL_PREDICT:
+						_x_updated[0] = _x_bef_updated[0] + (_x_updated[0]-_x_bef_updated[0])*LIMIT_PPL_PREDICT/_vector_norm
+						_x_updated[3] = _x_bef_updated[3] + (_x_updated[3]-_x_bef_updated[3])*LIMIT_PPL_PREDICT/_vector_norm
 				track_KF_point_new.append([_x_updated[0], _x_updated[3], track_KF_point[_kidx][2]
 					,track_KF_point[_kidx][3]
 					,track_KF_point[_kidx][4]
@@ -773,7 +808,7 @@ def processMunkresKalmanPeople(twolegs_tracks, onelegs_tracks, fw_handle, is_wri
 		_frame_idx = _frame_idx + 1
 
 	if is_write_to_file:
-		writeResultToFile(fw_handle, tracks_KF, tracks_conf, tracks_KF_points)
+		writeResultToFile(fw_handle, tracks_KF, tracks_conf, tracks_KF_points, twolegs_tracks, onelegs_tracks, tracks_KF_onelegmode)
 	return tracks_KF, _person_id-1, tracks_KF_points, tracks_conf, tracks_KF_confirmations, tracks_KF_onelegmode
 
 CLIP_Y_MIN = 0 #1. #0.5
