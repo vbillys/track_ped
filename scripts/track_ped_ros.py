@@ -18,10 +18,17 @@ import matplotlib.animation as animation
 from CustomCreateKF import createLegKF, createPersonKF, squareMatrix
 
 g_pub_ppl = None
+#<<<<<<< Updated upstream
 g_use_display = True #True #False
-g_use_decay_when_nodata =False # True #False #True
+#g_use_decay_when_nodata =False # True #False #True
 g_use_raw_leg_data = False
 g_no_ppl_predict_when_update_fail = True
+#=======
+g_use_display = True #True #True #False
+g_use_decay_when_nodata = True #False #True
+g_use_raw_leg_data = False
+g_use_clip = False
+#>>>>>>> Stashed changes
 
 COST_MAX_GATING = .8 #1.5 #.7 #1.5 #.7 #1.5
 COST_MAX_GATING_ONELEG = .8 #1.5 #.7 #1.5 #.7 #1.5
@@ -347,8 +354,9 @@ class PeopleTrackerFromLegs:
 			# print 'Skipping frame %d, empty data, may not real time' % (_frame_idx)
 			if self.use_decay_when_nodata:
 				if self.use_display:
+					pass
 					# print 'Skipping frame ..., empty data, may not real time'
-					print 'Decaying all tracks !!, no data'
+					# print 'Decaying all tracks !!, no data'
 				track_KF_new = []
 				track_conf_new = []
 				track_KF_point_new = []
@@ -377,7 +385,8 @@ class PeopleTrackerFromLegs:
 						self.display.update(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations, self.track_KF_onelegmode)
 			else:
 				if self.use_display:
-					print 'Skipping frame ..., empty data, may not real time'
+					pass
+					#print 'Skipping frame ..., empty data, may not real time'
 
 
 		# _frame_idx = _frame_idx + 1
@@ -611,7 +620,7 @@ class PeopleTrackerFromLegs:
 					track_KF_onelegmode_new.append(0)
 					self._people_id = self._people_id + 1
 				else:
-					print 'updated...'
+					#print 'updated...'
 					kalman_filters_new.append(self.kalman_filters_people[rows[columns.index(i)]])
 					self.kalman_filters_people[rows[columns.index(i)]].update([twolegs_track[i][6], twolegs_track[i][7]]) 
 
@@ -725,9 +734,9 @@ class PeopleTrackerFromLegs:
 							track_KF_improvements_new.append(self.track_conf_people[_index])
 							track_KF_confirmations_new.append(self.track_conf_people[_index])
 							track_KF_onelegmode_new.append(3)
-							if kf_obji == 1:
-								print 'object 1 found no oneleg decaying...'
-								print track_KF_point_new
+							#if kf_obji == 1:
+								#print 'object 1 found no oneleg decaying...'
+								#print track_KF_point_new
 
 
 			self.kalman_filters_people= kalman_filters_new
@@ -867,12 +876,14 @@ def processLegArray(msg):
 		if l.xLeg == 0 and l.yLeg == 0:
 			continue
 		points.append([l.xLeg, l.yLeg, l.ConLeg])
-	points = clipPoints(points, CLIP_X_ABS , CLIP_Y_MAX)
+	if g_use_clip:
+		points = clipPoints(points, CLIP_X_ABS , CLIP_Y_MAX)
 	people_tracker.processMunkresKalman(points)
 	# people_tracker.findPeopleTracks()
 	toc = time.time()
 	if g_use_display:
-		print toc - tic
+		pass
+		#print toc - tic
 
 
 def talker():
