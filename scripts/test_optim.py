@@ -1,4 +1,5 @@
 from scipy.optimize import fmin_cg
+from minimize import minimize
 import numpy as np
 
 args = (2, 3, 7, 8, 9, 10)
@@ -18,3 +19,4 @@ def gradf(x, *args):
 x0 = np.asarray((0, 0))
 res1 = fmin_cg(f, x0, fprime=gradf, args=args)
 print res1
+print minimize(x0, f, gradf, args, maxnumfuneval = 1000)
