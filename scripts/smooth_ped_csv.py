@@ -10,8 +10,8 @@ import pylab as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
 
-f_handle = open('processed_data_5.csv','r')
-# f_handle = open('processed_data_8sim.csv','r')
+# f_handle = open('processed_data_5.csv','r')
+f_handle = open('processed_data_8sim.csv','r')
 
 def namedlist(typename, field_names):
     fields_len = len(field_names)
@@ -58,7 +58,7 @@ def namedlist(typename, field_names):
     return ResultType
 
 ProcessedData = namedtuple('ProcessedData','people twoleg oneleg targets targets_ids')
-TargetData = namedlist('TargetData',('targets', 'targets_ids', 'max_target_id'))
+TargetData = namedlist('TargetData',('targets', 'targets_frames', 'targets_modes', 'max_target_id'))
 
 def readProcessedData(f_handle):
 	f_content = f_handle.readlines()
@@ -77,7 +77,7 @@ def readProcessedData(f_handle):
 
 		if strs:
 			if rolling_count % 3 == 0:
-				ppl_ = zip(*(iter(point_),) * 4)
+				ppl_ = zip(*(iter(point_),) * 5)
 				# people[-1].append(ppl_)
 				people[-1] = people[-1] + ppl_
 				# twoleg.append([])
@@ -125,7 +125,7 @@ def gatherPeopleTracks(processed_data):
 	# targets = [[] for _ in range(max_obj_id)]
 	# targets_ids = [[] for _ in range(max_obj_id)]
 
-	target_data = TargetData([[] for _ in range(max_obj_id)], [[] for _ in range(max_obj_id)], max_obj_id)
+	target_data = TargetData([[] for _ in range(max_obj_id)], [[] for _ in range(max_obj_id)], [[] for _ in range(max_obj_id)], max_obj_id)
 	# target_data = dict(targets = {x: [] for x in range (1, max_obj_id+1)}, targets_ids = {x: [] for x in range (1, max_obj_id+1)})
 	# for people, twoleg, oneleg in zip(processed_data.people, processed_data.twoleg, processed_data.oneleg):
 	for frame in processed_data.people:
@@ -139,7 +139,8 @@ def gatherPeopleTracks(processed_data):
 			# print int(target[1])
 			# print target
 			target_data.targets[int(target[1])-1].append([target[2],target[3],target[0]])
-			target_data.targets_ids[int(target[1])-1].append(_index_frame)
+			target_data.targets_frames[int(target[1])-1].append(_index_frame)
+			target_data.targets_modes[int(target[1])-1].append(int(target[4]))
 			# targets[int(target[1])-1].append([target[2],target[3],target[0]])
 			# targets_ids[int(target[1])-1].append(_index_frame)
 			# print _index_frame
@@ -154,7 +155,40 @@ def gatherPeopleTracks(processed_data):
 	return target_data
 	# return targets, targets_ids
 
+EDYN_WEIGHT = 2 #.03
+EEXC_WEIGHT = 1 #.6
+EPER_WEIGHT = 1 #.6
+EREG_WEIGHT = .5 #.6
+EOBS_LAMBDA = .1
+TARGET_SIZE = 35 #20
+CSIG = TARGET_SIZE * TARGET_SIZE
 
+class ContTracking:
+	def __init__(self, processed_data, target_data):
+		self.processed_data = processed_data
+		self.target_data = target_data
+	def calcEObs(self):
+		return 0
+
+	def calcEDyn(self):
+		return 0
+
+	def calcEExc(self):
+		return 0
+
+	def calcEPer(self):
+		return 0
+
+	def calcEReg(self):
+		return 0
+
+	def computeEnergy(self):
+		self.e_obs = self.calcEObs()
+		self.e_dyn = self.calcEDyn()
+		self.e_exc = self.calcEExc()
+		self.e_per = self.calcEPer()
+		self.e_reg = self.calcEReg()
+		return self.e_obs + EDYN_WEIGHT*self.e_dyn + EEXC_WEIGHT*self.e_exc + EPER_WEIGHT*self.e_per + EREG_WEIGHT*self.e_reg
 
 def plotPoints(data, target_data):
 	ax = plt.axes()
@@ -184,8 +218,12 @@ def plotPoints(data, target_data):
 processed_data =  readProcessedData(f_handle)
 target_data = gatherPeopleTracks(processed_data)
 # targets, targets_ids = gatherPeopleTracks(processed_data)
+# print target_data.targets_modes
 plotPoints(processed_data, target_data)
 # print target_data.targets, target_data.targets_ids
 # print targets, targets_ids
+
+cont_tracking = ContTracking(processed_data, target_data)
+print cont_tracking.computeEnergy()
 
 
