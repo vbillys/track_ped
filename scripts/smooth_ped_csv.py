@@ -11,7 +11,13 @@ import matplotlib.cm as cm
 import matplotlib.animation as animation
 
 # f_handle = open('processed_data_5.csv','r')
-f_handle = open('processed_data_8sim.csv','r')
+# f_handle = open('processed_data_8sim.csv','r')
+# f_handle = open('processed_data_1paper.csv','r')
+# f_handle = open('processed_data_2paper.csv','r')
+# f_handle = open('processed_data_3paper.csv','r')
+# f_handle = open('processed_data_4paper.csv','r')
+f_handle = open('processed_data_5paper.csv','r')
+# f_handle = open('processed_data_6paper.csv','r')
 
 def namedlist(typename, field_names):
     fields_len = len(field_names)
@@ -177,21 +183,21 @@ class ContTracking:
 			# # looping summation over all targes in all frames
 		_index_target = 0
 		# no need to loop over the people detections, we already parsed the targets
-		for target in target_data.targets:
+		for target in self.target_data.targets:
 			# check if the current target is there in the current frame
 			# if _index_frame in target_data.targets_frames[_index_target]:
 			_index_time = 0
-			for _index_frame in target_data.targets_frames[_index_target]:
+			for _index_frame in self.target_data.targets_frames[_index_target]:
 				# print _index_target
 				# _target_x = target[target_data.targets_frames[_index_target].index(_index_frame)][0]
 				# _target_y = target[target_data.targets_frames[_index_target].index(_index_frame)][1]
 				_target_x = target[_index_time][0]
 				_target_y = target[_index_time][1]
 				# get detections in current frame
-				_detections_x = np.array([ x[1] for x in processed_data.twoleg[_index_frame]+processed_data.oneleg[_index_frame] ] )
-				_detections_y = np.array([ x[2] for x in processed_data.twoleg[_index_frame]+processed_data.oneleg[_index_frame] ] )
+				_detections_x = np.array([ x[1] for x in self.processed_data.twoleg[_index_frame]+processed_data.oneleg[_index_frame] ] )
+				_detections_y = np.array([ x[2] for x in self.processed_data.twoleg[_index_frame]+processed_data.oneleg[_index_frame] ] )
 				# get weights for confidences
-				_detections_w = np.array([ x[0] for x in processed_data.twoleg[_index_frame]+processed_data.oneleg[_index_frame] ] )
+				_detections_w = np.array([ x[0] for x in self.processed_data.twoleg[_index_frame]+processed_data.oneleg[_index_frame] ] )
 				# get differences per axis x and y and then square them
 				# remember we are using cm units here in Energy
 				# print target
@@ -208,11 +214,11 @@ class ContTracking:
 	def calcEDyn(self):
 		fx = 0
 		_index_target = 0
-		for target in target_data.targets:
+		for target in self.target_data.targets:
 			# this index is to get time index for excluding the first and the last positions for acceleration calculation
 			_index_time = 0
-			_max_index_time = len(target_data.targets_frames[_index_target])
-			for _index_frame in target_data.targets_frames[_index_target]:
+			_max_index_time = len(self.target_data.targets_frames[_index_target])
+			for _index_frame in self.target_data.targets_frames[_index_target]:
 				# exclusing , see above note...
 				if _index_time == 0 or _index_time >= _max_index_time - 1:
 					_index_time = _index_time + 1
@@ -221,12 +227,12 @@ class ContTracking:
 				# (c,d) = current frame position
 				# (e,f) = next frame position
 				# also remember cm is the units
-				a = target_data.targets[_index_target][_index_time-1][0]*100
-				b = target_data.targets[_index_target][_index_time-1][1]*100
-				c = target_data.targets[_index_target][_index_time  ][0]*100
-				d = target_data.targets[_index_target][_index_time  ][1]*100
-				e = target_data.targets[_index_target][_index_time+1][0]*100
-				f = target_data.targets[_index_target][_index_time+1][1]*100
+				a = self.target_data.targets[_index_target][_index_time-1][0]*100
+				b = self.target_data.targets[_index_target][_index_time-1][1]*100
+				c = self.target_data.targets[_index_target][_index_time  ][0]*100
+				d = self.target_data.targets[_index_target][_index_time  ][1]*100
+				e = self.target_data.targets[_index_target][_index_time+1][0]*100
+				f = self.target_data.targets[_index_target][_index_time+1][1]*100
 				diffterm= a**2 + a*(2*e - 4*c) + b**2 + b*(2*f - 4*d) + 4*c**2  - 4*c*e + 4*d**2  - 4*d*f + e**2  + f**2
 				fx = fx + diffterm
 				_index_time = _index_time + 1
@@ -235,29 +241,41 @@ class ContTracking:
 
 	def calcEExc(self):
 		# also remember cm is the units
-		def computeEExcWithIndex(i,j,self, this_frame_target, index_time):
-			a = self.target_data.targets[this_frame_target[i]][index_time][0]*100
-			b = self.target_data.targets[this_frame_target[i]][index_time][1]*100
-			c = self.target_data.targets[this_frame_target[j]][index_time][0]*100
-			d = self.target_data.targets[this_frame_target[j]][index_time][1]*100
+		def computeEExcWithIndex(i,j,self, this_frame_target, index_frame):
+			# a = self.target_data.targets[this_frame_target[i]][index_time][0]*100
+			# b = self.target_data.targets[this_frame_target[i]][index_time][1]*100
+			# c = self.target_data.targets[this_frame_target[j]][index_time][0]*100
+			# d = self.target_data.targets[this_frame_target[j]][index_time][1]*100
+			obj_id_i = this_frame_target[i]
+			obj_id_j = this_frame_target[j]
+			index_time_i = self.target_data.targets_frames[obj_id_i].index(index_frame)
+			index_time_j = self.target_data.targets_frames[obj_id_j].index(index_frame)
+			a = self.target_data.targets[obj_id_i][index_time_i][0]*100
+			b = self.target_data.targets[obj_id_i][index_time_i][1]*100
+			c = self.target_data.targets[obj_id_j][index_time_j][0]*100
+			d = self.target_data.targets[obj_id_j][index_time_j][1]*100
+			# print obj_id_i, obj_id_j
 			return CSIG / (a**2 + b**2 + c**2 + d**2 -2*a*c - 2*b*d)
 		# for this one we do need to loop over the frames instead of targets
 		fx = 0
 		_index_frame = 0
-		for frame in processed_data.people:
+		for frame in self.processed_data.people:
 			_index_target = 0
 			this_frame_target = []
-			for target in target_data.targets:
+			for target in self.target_data.targets:
 				# check if the current target is there in the current frame
 				# and if yes we add to the array
-				if _index_frame in target_data.targets_frames[_index_target]:
+				if _index_frame in self.target_data.targets_frames[_index_target]:
 					this_frame_target.append(_index_target)
-				# we need a subfunction to calculate energy below (combinatorial strategy)
-				for i in range(0,len(this_frame_target)-1):
-					for j in range(i+1, len(this_frame_target)):
-							fx = fx + computeEExcWithIndex(i,j,self, this_frame_target, target_data.targets_frames[_index_target].index(_index_frame))
-
 				_index_target = _index_target + 1
+
+			# we need a subfunction to calculate energy below (combinatorial strategy)
+			# print this_frame_target
+			for i in range(0,len(this_frame_target)-1):
+				for j in range(i+1, len(this_frame_target)):
+						# fx = fx + computeEExcWithIndex(i,j,self, this_frame_target, target_data.targets_frames[_index_target].index(_index_frame))
+						fx = fx + computeEExcWithIndex(i,j,self, this_frame_target, _index_frame) #, target_data) #.targets_frames[_index_target].index(_index_frame))
+
 			_index_frame = _index_frame + 1
 		return fx
 
@@ -265,7 +283,7 @@ class ContTracking:
 		return 0
 
 	def calcEReg(self):
-		fx = len(target_data.targets)
+		fx = len(self.target_data.targets)
 		# get all trajectory length and compute sum of inverse of it
 		traj_lengths = np.array([len(x) for x in self.target_data.targets])
 		# MIU_EPER idea is from the irconttracking paper
@@ -323,7 +341,12 @@ def plotPoints(data, target_data):
 	ax.scatter(two_x+one_x, two_y+one_y, color='grey', s=48)
 	ax.xaxis.grid(True, which="major", linestyle='dotted')
 	ax.yaxis.grid(True, which="major", linestyle='dotted')
-	ax.axis([0, 10, -10, 10])
+	# ax.axis([0, 10, -10, 10])
+	# ax.axis('equal')
+	ax.axis([0, 5, -5, 5])
+	ax.set_aspect('equal','datalim')
+	# plt.plot([1.616998, 1.787815], [-3.009284, 1.741627])
+	plt.plot([1.54542264635, 1.9049684261], [-5, 5])
 	plt.show()
 
 processed_data =  readProcessedData(f_handle)
@@ -331,7 +354,7 @@ target_data = gatherPeopleTracks(processed_data)
 # targets, targets_ids = gatherPeopleTracks(processed_data)
 # print target_data.targets_modes
 
-# plotPoints(processed_data, target_data)
+plotPoints(processed_data, target_data)
 
 # print target_data.targets, target_data.targets_ids
 # print targets, targets_ids
