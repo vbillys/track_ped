@@ -159,28 +159,118 @@ EDYN_WEIGHT = 2 #.03
 EEXC_WEIGHT = 1 #.6
 EPER_WEIGHT = 1 #.6
 EREG_WEIGHT = .5 #.6
-EOBS_LAMBDA = .1
+EOBS_LAMBDA = .12 #10#.1
 TARGET_SIZE = 35 #20
 CSIG = TARGET_SIZE * TARGET_SIZE
+MIU_EPER = 1
 
 class ContTracking:
 	def __init__(self, processed_data, target_data):
 		self.processed_data = processed_data
 		self.target_data = target_data
+
 	def calcEObs(self):
-		return 0
+		fx = 0
+		# _index_frame = 0
+		# looping summation over all frames (all times)
+		# for frame in processed_data.people:
+			# # looping summation over all targes in all frames
+		_index_target = 0
+		# no need to loop over the people detections, we already parsed the targets
+		for target in target_data.targets:
+			# check if the current target is there in the current frame
+			# if _index_frame in target_data.targets_frames[_index_target]:
+			_index_time = 0
+			for _index_frame in target_data.targets_frames[_index_target]:
+				# print _index_target
+				# _target_x = target[target_data.targets_frames[_index_target].index(_index_frame)][0]
+				# _target_y = target[target_data.targets_frames[_index_target].index(_index_frame)][1]
+				_target_x = target[_index_time][0]
+				_target_y = target[_index_time][1]
+				# get detections in current frame
+				_detections_x = np.array([ x[1] for x in processed_data.twoleg[_index_frame]+processed_data.oneleg[_index_frame] ] )
+				_detections_y = np.array([ x[2] for x in processed_data.twoleg[_index_frame]+processed_data.oneleg[_index_frame] ] )
+				# get weights for confidences
+				_detections_w = np.array([ x[0] for x in processed_data.twoleg[_index_frame]+processed_data.oneleg[_index_frame] ] )
+				# get differences per axis x and y and then square them
+				# remember we are using cm units here in Energy
+				# print target
+				_xsx = ((_detections_x - _target_x)*100)**2
+				_ysy = ((_detections_y - _target_y)*100)**2
+				inner_sum = sum ((CSIG*_detections_w) / (_xsx + _ysy + CSIG))
+				# include lambda (this can be affected by occlusion or targets_modes) and the summation result over all detections
+				fx = fx + EOBS_LAMBDA - inner_sum
+				_index_time = _index_time + 1
+			_index_target = _index_target + 1
+			# _index_frame = _index_frame + 1
+		return fx 
 
 	def calcEDyn(self):
-		return 0
+		fx = 0
+		_index_target = 0
+		for target in target_data.targets:
+			# this index is to get time index for excluding the first and the last positions for acceleration calculation
+			_index_time = 0
+			_max_index_time = len(target_data.targets_frames[_index_target])
+			for _index_frame in target_data.targets_frames[_index_target]:
+				# exclusing , see above note...
+				if _index_time == 0 or _index_time >= _max_index_time - 1:
+					_index_time = _index_time + 1
+					continue
+				# (a,b) = past frame position
+				# (c,d) = current frame position
+				# (e,f) = next frame position
+				# also remember cm is the units
+				a = target_data.targets[_index_target][_index_time-1][0]*100
+				b = target_data.targets[_index_target][_index_time-1][1]*100
+				c = target_data.targets[_index_target][_index_time  ][0]*100
+				d = target_data.targets[_index_target][_index_time  ][1]*100
+				e = target_data.targets[_index_target][_index_time+1][0]*100
+				f = target_data.targets[_index_target][_index_time+1][1]*100
+				diffterm= a**2 + a*(2*e - 4*c) + b**2 + b*(2*f - 4*d) + 4*c**2  - 4*c*e + 4*d**2  - 4*d*f + e**2  + f**2
+				fx = fx + diffterm
+				_index_time = _index_time + 1
+			_index_target = _index_target + 1
+		return fx 
 
 	def calcEExc(self):
-		return 0
+		# also remember cm is the units
+		def computeEExcWithIndex(i,j,self, this_frame_target, index_time):
+			a = self.target_data.targets[this_frame_target[i]][index_time][0]*100
+			b = self.target_data.targets[this_frame_target[i]][index_time][1]*100
+			c = self.target_data.targets[this_frame_target[j]][index_time][0]*100
+			d = self.target_data.targets[this_frame_target[j]][index_time][1]*100
+			return CSIG / (a**2 + b**2 + c**2 + d**2 -2*a*c - 2*b*d)
+		# for this one we do need to loop over the frames instead of targets
+		fx = 0
+		_index_frame = 0
+		for frame in processed_data.people:
+			_index_target = 0
+			this_frame_target = []
+			for target in target_data.targets:
+				# check if the current target is there in the current frame
+				# and if yes we add to the array
+				if _index_frame in target_data.targets_frames[_index_target]:
+					this_frame_target.append(_index_target)
+				# we need a subfunction to calculate energy below (combinatorial strategy)
+				for i in range(0,len(this_frame_target)-1):
+					for j in range(i+1, len(this_frame_target)):
+							fx = fx + computeEExcWithIndex(i,j,self, this_frame_target, target_data.targets_frames[_index_target].index(_index_frame))
+
+				_index_target = _index_target + 1
+			_index_frame = _index_frame + 1
+		return fx
 
 	def calcEPer(self):
 		return 0
 
 	def calcEReg(self):
-		return 0
+		fx = len(target_data.targets)
+		# get all trajectory length and compute sum of inverse of it
+		traj_lengths = np.array([len(x) for x in self.target_data.targets])
+		# MIU_EPER idea is from the irconttracking paper
+		fx = fx + sum (1./traj_lengths)*MIU_EPER
+		return fx
 
 	def computeEnergy(self):
 		self.e_obs = self.calcEObs()
@@ -188,7 +278,28 @@ class ContTracking:
 		self.e_exc = self.calcEExc()
 		self.e_per = self.calcEPer()
 		self.e_reg = self.calcEReg()
+		print self.e_obs, self.e_dyn, self.e_exc, self.e_per, self.e_reg
 		return self.e_obs + EDYN_WEIGHT*self.e_dyn + EEXC_WEIGHT*self.e_exc + EPER_WEIGHT*self.e_per + EREG_WEIGHT*self.e_reg
+
+	def calcEObsPrime(self):
+		return 0
+
+	def calcEDynPrime(self):
+		return 0
+
+	def calcEExcPrime(self):
+		return 0
+
+	def calcEPerPrime(self):
+		return 0
+
+	def computeEnergyPrime(self):
+		self.e_obs_prime = self.calcEObsPrime()
+		self.e_dyn_prime = self.calcEDynPrime()
+		self.e_exc_prime = self.calcEExcPrime()
+		self.e_per_prime = self.calcEPerPrime()
+		# no ERegPrime as local minimization only changes state of points and not changing (adding / removing) new/old points
+		return self.e_obs_prime + EDYN_WEIGHT*self.e_dyn_prime + EEXC_WEIGHT*self.e_exc_prime + EPER_WEIGHT*self.e_per_prime
 
 def plotPoints(data, target_data):
 	ax = plt.axes()
@@ -219,11 +330,13 @@ processed_data =  readProcessedData(f_handle)
 target_data = gatherPeopleTracks(processed_data)
 # targets, targets_ids = gatherPeopleTracks(processed_data)
 # print target_data.targets_modes
-plotPoints(processed_data, target_data)
+
+# plotPoints(processed_data, target_data)
+
 # print target_data.targets, target_data.targets_ids
 # print targets, targets_ids
 
 cont_tracking = ContTracking(processed_data, target_data)
-print cont_tracking.computeEnergy()
+print cont_tracking.computeEnergy(), cont_tracking.computeEnergyPrime()
 
 
