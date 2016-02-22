@@ -31,14 +31,19 @@ import matplotlib.animation as animation
 # f_handle = open('ped_data_2paper.csv','r')
 # f_handle = open('ped_data_3paper.csv','r')
 f_handle = open('ped_data_4paper.csv','r')
+# f_handle = open('ped_data_5paper.csv','r')
+# f_handle = open('ped_data_6paper.csv','r')
 
 # fw_handle = open('processed_data_5.csv','w')
 # fw_handle = open('processed_data_8sim.csv','w')
 # fw_handle = open('processed_data_1paper.csv','w')
 # fw_handle = open('processed_data_2paper.csv','w')
 # fw_handle = open('processed_data_3paper.csv','w')
-fw_handle = open('processed_data_4paper.csv','w')
-g_is_write_to_file = True
+# fw_handle = open('processed_data_4paper.csv','w')
+# fw_handle = open('processed_data_5paper.csv','w')
+# fw_handle = open('processed_data_6paper.csv','w')
+fw_handle = None 
+g_is_write_to_file = False #True #False # True
 g_no_ppl_predict_when_update_fail = False #True#False #True
 g_use_limit_ppl_predict = False#True
 
@@ -51,6 +56,7 @@ class AnimatedScatter(object):
 		self.ani = animation.FuncAnimation(self.fig, self.update, interval=100, init_func=self.setup_plot, blit=True, frames=len(data)-1, repeat=False)
 
 	def setup_plot(self):
+		plt.plot([1.616998, 1.787815], [-3.009284, 1.741627])
 		# x, y, c, ct, obj_id, xkf, ykf = next(self.stream)
 		# x, y, c, ct, obj_id, xkf, ykf, twoleg_xs, twoleg_ys, oneleg_xs, oneleg_ys = next(self.stream)
 		x, y, c, ct, obj_id, xkf, ykf, twoleg_xs, twoleg_ys, oneleg_xs, oneleg_ys, xp, yp, ppl_id, ppl_cfm, ppl_olm = next(self.stream)
@@ -1141,7 +1147,8 @@ people_2legs_tracks, people_1leg_tracks = findPeopleTracks(tracks_KF_points, tra
 tracks_KF_people, max_people_id, tracks_KF_people_pp, tracks_people_conf, tracks_confirms, tracks_onelegmode = processMunkresKalmanPeople(people_2legs_tracks, people_1leg_tracks, fw_handle, g_is_write_to_file)
 t_end = time.time()
 print (-t_start + t_end) , len(points), (-t_start + t_end) / len(points)
-fw_handle.close()
+if fw_handle is not None:
+	fw_handle.close()
 plotPoints(points)
 # print people_2legs_tracks
 # print tracks_KF_people_pp

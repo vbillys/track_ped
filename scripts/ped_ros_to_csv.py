@@ -13,7 +13,9 @@ from mech_input.msg import LegMeasurementArray, LegMeasurement
 # f_handle = open('ped_data_1paper.csv','w')
 # f_handle = open('ped_data_2paper.csv','w')
 # f_handle = open('ped_data_3paper.csv','w')
-f_handle = open('ped_data_4paper.csv','w')
+# f_handle = open('ped_data_4paper.csv','w')
+# f_handle = open('ped_data_5paper.csv','w')
+f_handle = open('ped_data_6paper.csv','w')
 
 def processLegArray(msg):
 	print msg
