@@ -26,13 +26,21 @@ import matplotlib.animation as animation
 # f_handle = open('ped_data_5.csv','r')
 # f_handle = open('ped_data_6.csv','r')
 # f_handle = open('ped_data_7sim.csv','r')
-f_handle = open('ped_data_8sim.csv','r')
+# f_handle = open('ped_data_8sim.csv','r')
+# f_handle = open('ped_data_1paper.csv','r')
+# f_handle = open('ped_data_2paper.csv','r')
+# f_handle = open('ped_data_3paper.csv','r')
+f_handle = open('ped_data_4paper.csv','r')
 
 # fw_handle = open('processed_data_5.csv','w')
-fw_handle = open('processed_data_8sim.csv','w')
+# fw_handle = open('processed_data_8sim.csv','w')
+# fw_handle = open('processed_data_1paper.csv','w')
+# fw_handle = open('processed_data_2paper.csv','w')
+# fw_handle = open('processed_data_3paper.csv','w')
+fw_handle = open('processed_data_4paper.csv','w')
 g_is_write_to_file = True
-g_no_ppl_predict_when_update_fail = False #True
-g_use_limit_ppl_predict = True
+g_no_ppl_predict_when_update_fail = False #True#False #True
+g_use_limit_ppl_predict = False#True
 
 class AnimatedScatter(object):
 	def __init__(self, data):

@@ -4,8 +4,16 @@ from mech_input.msg import LegMeasurementArray, LegMeasurement
 # import csv
 
 
-f_handle = open('ped_data.csv','w')
+# f_handle = open('ped_data.csv','w')
 # f_handle = open('ped_data_2.csv','w')
+# f_handle = open('ped_data_5.csv','w')
+# f_handle = open('ped_data_6.csv','w')
+# f_handle = open('ped_data_7sim.csv','w')
+# f_handle = open('ped_data_8sim.csv','w')
+# f_handle = open('ped_data_1paper.csv','w')
+# f_handle = open('ped_data_2paper.csv','w')
+# f_handle = open('ped_data_3paper.csv','w')
+f_handle = open('ped_data_4paper.csv','w')
 
 def processLegArray(msg):
 	print msg

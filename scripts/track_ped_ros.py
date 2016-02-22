@@ -22,8 +22,8 @@ g_pub_ppl = None
 g_use_display = True #True #False
 #g_use_decay_when_nodata =False # True #False #True
 g_use_raw_leg_data = False
-g_no_ppl_predict_when_update_fail = False #True
-g_use_limit_ppl_predict = True
+g_no_ppl_predict_when_update_fail = False #True #False #True
+g_use_limit_ppl_predict = False #True
 #=======
 g_use_display = True #True #True #False
 g_use_decay_when_nodata = True #False #True
