@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import rospy
 from mech_input.msg import LegMeasurementArray, LegMeasurement , PersonTrack, PersonTrackArray
+from nav_msgs.msg import Odometry
+import tf
 
 from munkres import Munkres
 from scipy.spatial.distance import mahalanobis
@@ -22,7 +24,7 @@ g_pub_ppl = None
 g_use_display = True #True #False
 #g_use_decay_when_nodata =False # True #False #True
 g_use_raw_leg_data = False
-g_no_ppl_predict_when_update_fail = False #True #False #True
+g_no_ppl_predict_when_update_fail =  True #False #True #False #True
 g_use_limit_ppl_predict = False #True
 #=======
 g_use_display = True #True #True #False
@@ -808,6 +810,68 @@ def createIds(xx, yy, ids, cfms, olms, ax):
 		index = index + 1
 	return texts
 
+class AnimatedOdometry(object):
+	def __init__(self, history_cnt):
+		self.fig, self.ax = plt.subplots()
+		self.ax.axis([-10, 10, -10, 10])
+		self.ax.hold(True)
+		plt.ion()
+		self.fig.canvas.draw()
+		plt.show(False)
+		self._first = True
+		self._data_count = 0
+		self.xs_odom = []
+		self.ys_odom = []
+		self.yaws_odom = []
+		self.history_cnt = history_cnt
+
+	def setup_plot(self):
+		# xo, yo = aggreateCoord(data)
+		xo = self.xs_odom
+		yo = self.ys_odom
+		xo = [a - self.x_origin for a in xo]
+		yo = [a - self.y_origin for a in yo]
+		self.pplot, = plt.plot(xo, yo)
+		self.scat = self.ax.scatter(xo[0], yo[0], c='blue', s=200, marker='+', linewidth=2)
+		self.fig.canvas.draw()
+
+	def update(self):
+		# xo, yo = aggreateCoord(data)
+		xo = self.xs_odom
+		yo = self.ys_odom
+		xo = [a - self.x_origin for a in xo]
+		yo = [a - self.y_origin for a in yo]
+		# self.pplot.remove()
+		# plt.plot(xo, yo)
+		self.pplot.set_xdata(xo)
+		self.pplot.set_ydata(yo)
+		self.scat.set_offsets(np.column_stack((xo[0],yo[0])))
+		self.fig.canvas.draw()
+
+	def isFirst(self):
+		return self._first
+
+	def setFirst(self, stat):
+		self._first = stat
+
+	def getCounter(self):
+		return self._data_count
+
+	def pushData(self,x,y,yaw):
+		self.xs_odom.insert(0,x)
+		self.ys_odom.insert(0,y)
+		self.yaws_odom.insert(0,yaw)
+		if self._data_count == 0:
+			self.x_origin = x
+			self.y_origin = y
+			self.yaw_origin =yaw 
+		self._data_count = self._data_count + 1
+		if self._data_count > self.history_cnt:
+			self.xs_odom.pop()
+			self.ys_odom.pop()
+			self.yaws_odom.pop()
+
+
 # class AnimatedScatter(object):
 class AnimatedScatter:
 	def __init__(self):
@@ -876,6 +940,7 @@ def clipPoints(frame, abs_max_x, max_y):
 # people_tracker = PeopleTrackerFromLegs(display_tracker)
 display_tracker = None
 people_tracker = None
+display_odometry = None
 def processLegArray(msg):
 	# print msg
 	tic = time.time()
@@ -891,17 +956,44 @@ def processLegArray(msg):
 	# people_tracker.findPeopleTracks()
 	toc = time.time()
 	if g_use_display:
-		pass
-		#print toc - tic
+		# pass
+		print toc - tic
 
+def euler_to_degrees(input):
+	output = [0,0,0]
+	output[0] = round(math.degrees(input[0]),3)
+	output[1] = round(math.degrees(input[1]),3)
+	output[2] = round(math.degrees(input[2]),3)
+	return output
+
+def processOdometry(msg):
+	tic = time.time()
+	x_odom = msg.pose.pose.position.x
+	y_odom = msg.pose.pose.position.y
+	quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
+	euler = tf.transformations.euler_from_quaternion(quat)
+	# euler = euler_to_degrees(euler)
+	yaw_odom = euler[2]
+	# print x_odom, y_odom, yaw_odom
+	display_odometry.pushData(x_odom, y_odom, yaw_odom)
+	if display_odometry.isFirst():
+		if display_odometry.getCounter() > 10:
+			display_odometry.setFirst(False)
+			display_odometry.setup_plot()
+	else:
+		display_odometry.update()
+	toc = time.time()
+	print toc - tic
 
 def talker():
-	global g_pub_ppl, display_tracker, people_tracker
+	global g_pub_ppl, display_tracker, people_tracker, display_odometry
 	rospy.init_node('track_ped', anonymous=False)
 	# rospy.Subscriber('/usb_cam/image_raw', Image, filter_points)
 	rospy.Subscriber('/legs', LegMeasurementArray, processLegArray)
+	rospy.Subscriber('/RosAria/pose', Odometry, processOdometry)
 	g_pub_ppl = rospy.Publisher('/persons', PersonTrackArray, queue_size = 10)
 	display_tracker= AnimatedScatter()
+	display_odometry = AnimatedOdometry(50)
 	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail, g_use_limit_ppl_predict )
 	rospy.spin()
 	pass
