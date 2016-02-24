@@ -8,6 +8,8 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  sensor_msgs
+  laser_geometry
 )
 
 ## System dependencies are found with CMake's conventions
@@ -104,6 +106,7 @@ include_directories(
 
 ## Declare a cpp executable
 # add_executable(track_ped_node src/track_ped_node.cpp)
+add_executable(convert_node src/convertLaserScanToPointCloud.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -113,6 +116,8 @@ include_directories(
 # target_link_libraries(track_ped_node
 #   ${catkin_LIBRARIES}
 # )
+target_link_libraries(convert_node ${roscpp_LIBRARIES} ${catkin_LIBRARIES}
+)
 
 #############
 ## Install ##
