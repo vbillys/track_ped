@@ -2,6 +2,7 @@
 import rospy
 from mech_input.msg import LegMeasurementArray, LegMeasurement , PersonTrack, PersonTrackArray
 from nav_msgs.msg import Odometry
+from sensor_msgs.msg import PointCloud
 import tf
 
 from munkres import Munkres
@@ -810,7 +811,7 @@ def createIds(xx, yy, ids, cfms, olms, ax):
 		index = index + 1
 	return texts
 
-class AnimatedOdometry(object):
+class AnimatedMovingRobot(object):
 	def __init__(self, history_cnt):
 		self.fig, self.ax = plt.subplots()
 		self.ax.axis([-10, 10, -10, 10])
@@ -824,6 +825,8 @@ class AnimatedOdometry(object):
 		self.ys_odom = []
 		self.yaws_odom = []
 		self.history_cnt = history_cnt
+		self.xpc_pointcloud = []
+		self.ypc_pointcloud = []
 
 	def setup_plot(self):
 		# xo, yo = aggreateCoord(data)
@@ -833,6 +836,15 @@ class AnimatedOdometry(object):
 		yo = [a - self.y_origin for a in yo]
 		self.pplot, = plt.plot(xo, yo)
 		self.scat = self.ax.scatter(xo[0], yo[0], c='blue', s=200, marker='+', linewidth=2)
+
+		pointscloud = np.column_stack((self.xpc_pointcloud, self.ypc_pointcloud))
+		yawo = self.yaws_odom[0] - self.yaw_origin #- math.pi/2
+		rotmatrix = np.array([[math.cos(yawo), math.sin(yawo)],[-math.sin(yawo), math.cos(yawo)]])
+		# pointscloud_transformed = np.dot(rotmatrix, pointscloud.T- np.array([[xo[0]],[yo[0]]])) 
+		pointscloud_transformed = np.dot(rotmatrix, pointscloud.T) + np.array([[xo[0]],[yo[0]]])
+		# pointscloud_transformed = pointscloud.T + np.array([[xo[0]],[yo[0]]])
+		# self.scat2 = self.ax.scatter(self.xpc_pointcloud, self.ypc_pointcloud, c='black', s=20 )
+		self.scat2 = self.ax.scatter(pointscloud_transformed[0,:],pointscloud_transformed[1,:], c='grey', s=2 )
 		self.fig.canvas.draw()
 
 	def update(self):
@@ -846,6 +858,15 @@ class AnimatedOdometry(object):
 		self.pplot.set_xdata(xo)
 		self.pplot.set_ydata(yo)
 		self.scat.set_offsets(np.column_stack((xo[0],yo[0])))
+
+		pointscloud = np.column_stack((self.xpc_pointcloud, self.ypc_pointcloud))
+		yawo = self.yaws_odom[0] - self.yaw_origin #- math.pi/2
+		rotmatrix = np.array([[math.cos(yawo), math.sin(yawo)],[-math.sin(yawo), math.cos(yawo)]])
+		# pointscloud_transformed = np.dot(rotmatrix, pointscloud.T- np.array([[xo[0]],[yo[0]]]))
+		pointscloud_transformed = np.dot(rotmatrix, pointscloud.T)+ np.array([[xo[0]],[yo[0]]])
+		# pointscloud_transformed = pointscloud.T + np.array([[xo[0]],[yo[0]]])
+		# self.scat2.set_offsets(np.column_stack((self.xpc_pointcloud, self.ypc_pointcloud)))
+		self.scat2.set_offsets(pointscloud_transformed.T)
 		self.fig.canvas.draw()
 
 	def isFirst(self):
@@ -858,6 +879,8 @@ class AnimatedOdometry(object):
 		return self._data_count
 
 	def pushData(self,x,y,yaw):
+		# if self._data_count > 0:
+			# print x-self.x_origin,y-self.y_origin,yaw-self.yaw_origin
 		self.xs_odom.insert(0,x)
 		self.ys_odom.insert(0,y)
 		self.yaws_odom.insert(0,yaw)
@@ -871,12 +894,20 @@ class AnimatedOdometry(object):
 			self.ys_odom.pop()
 			self.yaws_odom.pop()
 
+	def setPointCloud(self,xpc, ypc):
+		self.xpc_pointcloud = xpc
+		self.ypc_pointcloud = ypc
 
 # class AnimatedScatter(object):
 class AnimatedScatter:
-	def __init__(self):
+	def __init__(self, reverse_xy):
+		self.reverse_xy = reverse_xy
 		self.fig, self.ax = plt.subplots()
-		self.ax.axis([0, 6, -10, 10])
+		if self.reverse_xy:
+			self.ax.axis([-20, 20, 0, 15])
+		else:
+			self.ax.axis([0, 6, -10, 10])
+		self.ax.set_aspect('equal','datalim')
 		self.ax.hold(True)
 		# plt.axis([0, 4, -10, 10])
 		plt.ion()
@@ -887,8 +918,11 @@ class AnimatedScatter:
 		# self.scat2 =  None
 		self.scat = self.ax.scatter([], [], c='blue', cmap=plt.cm.PuOr, s=128)
 		self.scat2 = self.ax.scatter([], [], c='red', cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
-		self.scat3 = self.ax.scatter([], [], c='black', marker='^', s=100, linewidth=4)
+		# self.scat3 = self.ax.scatter([], [], c='magenta', marker='^', s=50, linewidth=.5)
 		self.texts = []
+		self.xpc_pointcloud = []
+		self.ypc_pointcloud = []
+		self.scat4 = self.ax.scatter(self.xpc_pointcloud, self.ypc_pointcloud, c='black', s=5 )
 
 	def removeTexts(self):
 		for text in self.texts:
@@ -900,11 +934,19 @@ class AnimatedScatter:
 		xskf, yskf = aggreateCoord(data_kf)
 		xskfppl , yskfppl = aggreateCoord(data_pp_ppl)
 		self.removeTexts()
-		self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
 		# self.scat = self.ax.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
-		self.scat.set_offsets(np.column_stack((xs, ys)))
-		self.scat2.set_offsets(np.column_stack((xskf, yskf)))
-		self.scat3.set_offsets(np.column_stack((xskfppl, yskfppl)))
+		if self.reverse_xy:
+			self.texts = createIds(yskfppl, xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
+			self.scat.set_offsets(np.column_stack((ys, xs)))
+			self.scat2.set_offsets(np.column_stack((yskf, xskf)))
+			# self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
+			self.scat4.set_offsets(np.column_stack((self.ypc_pointcloud, self.xpc_pointcloud)))
+		else:
+			self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
+			self.scat.set_offsets(np.column_stack((xs, ys)))
+			self.scat2.set_offsets(np.column_stack((xskf, yskf)))
+			# self.scat3.set_offsets(np.column_stack((xskfppl, yskfppl)))
+			self.scat4.set_offsets(np.column_stack((self.xpc_pointcloud, self.ypc_pointcloud)))
 		# self.scat2 = self.ax.scatter(xkf, ykf, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
 		# plt.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
 		self.fig.canvas.draw()
@@ -915,14 +957,27 @@ class AnimatedScatter:
 		xskf, yskf = aggreateCoord(data_kf)
 		xskfppl , yskfppl = aggreateCoord(data_pp_ppl)
 		self.removeTexts()
-		self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
 		# plt.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
-		self.scat.set_offsets(np.column_stack((xs, ys)))
-		self.scat2.set_offsets(np.column_stack((xskf, yskf)))
-		self.scat3.set_offsets(np.column_stack((xskfppl, yskfppl)))
+		if self.reverse_xy:
+			self.texts = createIds(yskfppl, xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
+			self.scat.set_offsets(np.column_stack((ys, xs)))
+			self.scat2.set_offsets(np.column_stack((yskf, xskf)))
+			# self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
+			self.scat4.set_offsets(np.column_stack((self.ypc_pointcloud, self.xpc_pointcloud)))
+		else:
+			self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
+			self.scat.set_offsets(np.column_stack((xs, ys)))
+			self.scat2.set_offsets(np.column_stack((xskf, yskf)))
+			# self.scat3.set_offsets(np.column_stack((xskfppl, yskfppl)))
+			self.scat4.set_offsets(np.column_stack((self.xpc_pointcloud, self.ypc_pointcloud)))
 		# self.scat.set_color(data[2])
 		self.fig.canvas.draw()
 		# plt.draw()
+
+	def setPointCloud(self,xpc, ypc):
+		self.xpc_pointcloud = xpc
+		self.ypc_pointcloud = ypc
+
 
 CLIP_Y_MIN = 0 #1. #0.5
 CLIP_Y_MAX = 6 #3.5
@@ -940,10 +995,10 @@ def clipPoints(frame, abs_max_x, max_y):
 # people_tracker = PeopleTrackerFromLegs(display_tracker)
 display_tracker = None
 people_tracker = None
-display_odometry = None
+display_moving_robot = None
 def processLegArray(msg):
 	# print msg
-	tic = time.time()
+	# tic = time.time()
 	points = []
 	for l in msg.Legs:
 		# print l
@@ -954,10 +1009,10 @@ def processLegArray(msg):
 		points = clipPoints(points, CLIP_X_ABS , CLIP_Y_MAX)
 	people_tracker.processMunkresKalman(points)
 	# people_tracker.findPeopleTracks()
-	toc = time.time()
-	if g_use_display:
-		# pass
-		print toc - tic
+	# toc = time.time()
+	# if g_use_display:
+		# # pass
+		# print toc - tic
 
 def euler_to_degrees(input):
 	output = [0,0,0]
@@ -967,7 +1022,7 @@ def euler_to_degrees(input):
 	return output
 
 def processOdometry(msg):
-	tic = time.time()
+	# tic = time.time()
 	x_odom = msg.pose.pose.position.x
 	y_odom = msg.pose.pose.position.y
 	quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
@@ -975,25 +1030,34 @@ def processOdometry(msg):
 	# euler = euler_to_degrees(euler)
 	yaw_odom = euler[2]
 	# print x_odom, y_odom, yaw_odom
-	display_odometry.pushData(x_odom, y_odom, yaw_odom)
-	if display_odometry.isFirst():
-		if display_odometry.getCounter() > 10:
-			display_odometry.setFirst(False)
-			display_odometry.setup_plot()
+	display_moving_robot.pushData(x_odom, y_odom, yaw_odom)
+	if display_moving_robot.isFirst():
+		if display_moving_robot.getCounter() > 10:
+			display_moving_robot.setFirst(False)
+			display_moving_robot.setup_plot()
 	else:
-		display_odometry.update()
-	toc = time.time()
-	print toc - tic
+		display_moving_robot.update()
+	# toc = time.time()
+	# print toc - tic
+
+def processPointCloud(msg):
+	# print len(msg.points)
+	xps = [a.x for a in msg.points]
+	yps = [a.y for a in msg.points]
+	# display_moving_robot.setPointCloud(xps, yps)
+	display_tracker.setPointCloud(xps, yps)
+
 
 def talker():
-	global g_pub_ppl, display_tracker, people_tracker, display_odometry
+	global g_pub_ppl, display_tracker, people_tracker, display_moving_robot
 	rospy.init_node('track_ped', anonymous=False)
 	# rospy.Subscriber('/usb_cam/image_raw', Image, filter_points)
 	rospy.Subscriber('/legs', LegMeasurementArray, processLegArray)
-	rospy.Subscriber('/RosAria/pose', Odometry, processOdometry)
+	# rospy.Subscriber('/RosAria/pose', Odometry, processOdometry)
+	rospy.Subscriber('/converted_laserscan', PointCloud, processPointCloud)
 	g_pub_ppl = rospy.Publisher('/persons', PersonTrackArray, queue_size = 10)
-	display_tracker= AnimatedScatter()
-	display_odometry = AnimatedOdometry(50)
+	display_tracker= AnimatedScatter(True)
+	# display_moving_robot = AnimatedMovingRobot(50)
 	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail, g_use_limit_ppl_predict )
 	rospy.spin()
 	pass
