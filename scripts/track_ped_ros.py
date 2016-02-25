@@ -25,7 +25,7 @@ print writer_registry.list()
 FFMpegWriter = animation.writers['ffmpeg']
 print FFMpegWriter
 g_movie_writer = FFMpegWriter(fps=10)
-g_movie_filename = "legdyn3_a.mp4"
+g_movie_filename = "legdyn4_a.mp4"
 
 g_pub_ppl = None
 #<<<<<<< Updated upstream
@@ -970,14 +970,15 @@ class AnimatedScatter:
 			# self.scat.set_offsets(np.column_stack((ys, xs)))
 			# self.scat2.set_offsets(np.column_stack((yskf, xskf)))
 			# # self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
+			# self.scat4.set_offsets(np.column_stack(([-a for a in self.ypc_pointcloud], self.xpc_pointcloud)))
 			self.scat4.set_offsets(np.column_stack((self.ypc_pointcloud, self.xpc_pointcloud)))
 			if self.display_recorded_persons:
-				self.scat5.set_offsets(np.column_stack((self.yps_persons, self.xps_persons)))
-				self.texts = createIdsFromPersons(self.yps_persons, self.xps_persons, self.ids_persons, self.ax)
+				self.scat5.set_offsets(np.column_stack(([-a for a in self.yps_persons], self.xps_persons)))
+				self.texts = createIdsFromPersons([-a for a in self.yps_persons], self.xps_persons, self.ids_persons, self.ax)
 			else:
-				self.texts = createIds(yskfppl, xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
-				self.scat.set_offsets(np.column_stack((ys, xs)))
-				self.scat2.set_offsets(np.column_stack((yskf, xskf)))
+				self.texts = createIds([-a for a in self.yps_persons], xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
+				self.scat.set_offsets(np.column_stack(([-a for a in ys], xs)))
+				self.scat2.set_offsets(np.column_stack(([-a for a in yskf], xskf)))
 				# self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
 		else:
 			# self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
@@ -1011,14 +1012,15 @@ class AnimatedScatter:
 			# self.scat.set_offsets(np.column_stack((ys, xs)))
 			# self.scat2.set_offsets(np.column_stack((yskf, xskf)))
 			# # self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
+			# self.scat4.set_offsets(np.column_stack(([-a for a in self.ypc_pointcloud], self.xpc_pointcloud)))
 			self.scat4.set_offsets(np.column_stack((self.ypc_pointcloud, self.xpc_pointcloud)))
 			if self.display_recorded_persons:
-				self.scat5.set_offsets(np.column_stack((self.yps_persons, self.xps_persons)))
-				self.texts = createIdsFromPersons(self.yps_persons, self.xps_persons, self.ids_persons, self.ax)
+				self.scat5.set_offsets(np.column_stack(([-a for a in self.yps_persons], self.xps_persons)))
+				self.texts = createIdsFromPersons([-a for a in self.yps_persons], self.xps_persons, self.ids_persons, self.ax)
 			else:
-				self.texts = createIds(yskfppl, xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
-				self.scat.set_offsets(np.column_stack((ys, xs)))
-				self.scat2.set_offsets(np.column_stack((yskf, xskf)))
+				self.texts = createIds([-a for a in self.yps_persons], xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
+				self.scat.set_offsets(np.column_stack(([-a for a in ys], xs)))
+				self.scat2.set_offsets(np.column_stack(([-a for a in yskf], xskf)))
 				# self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
 		else:
 			# self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
@@ -1042,7 +1044,10 @@ class AnimatedScatter:
 
 	def setPointCloud(self,xpc, ypc):
 		self.xpc_pointcloud = xpc
-		self.ypc_pointcloud = ypc
+		if self.reverse_xy:
+			self.ypc_pointcloud = [-a for a in ypc]
+		else:
+			self.ypc_pointcloud = ypc
 
 	def setPersons(self, xps, yps, ids):
 		self.xps_persons = xps
