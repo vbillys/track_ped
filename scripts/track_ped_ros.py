@@ -20,6 +20,13 @@ import matplotlib.animation as animation
 
 from CustomCreateKF import createLegKF, createPersonKF, squareMatrix
 
+writer_registry = animation.MovieWriterRegistry()
+print writer_registry.list()
+FFMpegWriter = animation.writers['ffmpeg']
+print FFMpegWriter
+g_movie_writer = FFMpegWriter(fps=10)
+g_movie_filename = "legdyn3_a.mp4"
+
 g_pub_ppl = None
 #<<<<<<< Updated upstream
 g_use_display = True #True #False
@@ -900,8 +907,9 @@ class AnimatedMovingRobot(object):
 
 # class AnimatedScatter(object):
 class AnimatedScatter:
-	def __init__(self, reverse_xy):
-		self.reverse_xy = reverse_xy
+	def __init__(self, opt):
+		self.reverse_xy = opt['reverse_xy']
+		self.save_movie = opt['save_movie']
 		self.fig, self.ax = plt.subplots()
 		if self.reverse_xy:
 			self.ax.axis([-20, 20, 0, 15])
@@ -923,6 +931,9 @@ class AnimatedScatter:
 		self.xpc_pointcloud = []
 		self.ypc_pointcloud = []
 		self.scat4 = self.ax.scatter(self.xpc_pointcloud, self.ypc_pointcloud, c='black', s=5 )
+
+	def getFig(self):
+		return self.fig
 
 	def removeTexts(self):
 		for text in self.texts:
@@ -950,6 +961,8 @@ class AnimatedScatter:
 		# self.scat2 = self.ax.scatter(xkf, ykf, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
 		# plt.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
 		self.fig.canvas.draw()
+		if self.save_movie:
+			g_movie_writer.grab_frame()
 		# plt.draw()
 
 	def update(self,data, data_kf, data_pp_ppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm):
@@ -972,6 +985,8 @@ class AnimatedScatter:
 			self.scat4.set_offsets(np.column_stack((self.xpc_pointcloud, self.ypc_pointcloud)))
 		# self.scat.set_color(data[2])
 		self.fig.canvas.draw()
+		if self.save_movie:
+			g_movie_writer.grab_frame()
 		# plt.draw()
 
 	def setPointCloud(self,xpc, ypc):
@@ -1056,10 +1071,13 @@ def talker():
 	# rospy.Subscriber('/RosAria/pose', Odometry, processOdometry)
 	rospy.Subscriber('/converted_laserscan', PointCloud, processPointCloud)
 	g_pub_ppl = rospy.Publisher('/persons', PersonTrackArray, queue_size = 10)
-	display_tracker= AnimatedScatter(True)
+	display_tracker_opts = {'reverse_xy': True, 'save_movie' : True}
+	display_tracker= AnimatedScatter(display_tracker_opts)
 	# display_moving_robot = AnimatedMovingRobot(50)
 	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail, g_use_limit_ppl_predict )
-	rospy.spin()
+
+	with g_movie_writer.saving(display_tracker.getFig(), g_movie_filename, 150):
+		rospy.spin()
 	pass
 
 if __name__ == '__main__':
