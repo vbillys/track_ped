@@ -154,8 +154,9 @@ def getMMSEOneLegs(check, onelegs_track, R, KF_point, P):
 	return mmse_x , mmse_y, P_mmse
 
 class PeopleTrackerFromLegs:
-	def __init__(self, display, pub_persons, use_display, use_decay_when_nodata, use_raw_leg_data, no_ppl_predict_when_update_fail,use_limit_ppl_predict ):
+	def __init__(self, display, pub_persons, use_display, use_decay_when_nodata, use_raw_leg_data, no_ppl_predict_when_update_fail,use_limit_ppl_predict, opt ):
 		self.use_display = use_display
+		self.no_publish_result = opt['no_publish_result']
 		self.use_decay_when_nodata = use_decay_when_nodata
 		self.no_ppl_predict_when_update_fail = no_ppl_predict_when_update_fail
 		self.use_limit_ppl_predict = use_limit_ppl_predict
@@ -357,7 +358,8 @@ class PeopleTrackerFromLegs:
 				# self.display.update(frame, self.track_KF_point_leg)
 			self.findPeopleTracks()
 			self.processMunkresKalmanPeople()
-			self.publishPersons()
+			if not self.no_publish_result:
+				self.publishPersons()
 			if self.use_display:
 				if not self._first_leg:
 					self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations, self.track_KF_onelegmode)
@@ -390,7 +392,8 @@ class PeopleTrackerFromLegs:
 
 				self.findPeopleTracks()
 				self.processMunkresKalmanPeople()
-				self.publishPersons()
+				if not self.no_publish_result:
+					self.publishPersons()
 				if self.use_display:
 					if not self._first_leg:
 						self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations, self.track_KF_onelegmode)
@@ -799,6 +802,15 @@ def aggreateCoord(data):
 		ys.append(leg[1])
 	return xs, ys
 
+def createIdsFromPersons(xx, yy, ids, ax):
+	index = 0
+	texts = []
+	for _id in ids:
+		text = ax.text(xx[index], yy[index] + 0.3, str(_id), color='green')
+		texts.append(text)
+		index = index + 1
+	return texts
+
 def createIds(xx, yy, ids, cfms, olms, ax):
 	index = 0
 	texts = []
@@ -905,14 +917,16 @@ class AnimatedMovingRobot(object):
 		self.xpc_pointcloud = xpc
 		self.ypc_pointcloud = ypc
 
+
 # class AnimatedScatter(object):
 class AnimatedScatter:
 	def __init__(self, opt):
 		self.reverse_xy = opt['reverse_xy']
 		self.save_movie = opt['save_movie']
+		self.display_recorded_persons = opt['display_recorded_persons']
 		self.fig, self.ax = plt.subplots()
 		if self.reverse_xy:
-			self.ax.axis([-20, 20, 0, 15])
+			self.ax.axis([-5, 5, 0, 5])
 		else:
 			self.ax.axis([0, 6, -10, 10])
 		self.ax.set_aspect('equal','datalim')
@@ -931,6 +945,11 @@ class AnimatedScatter:
 		self.xpc_pointcloud = []
 		self.ypc_pointcloud = []
 		self.scat4 = self.ax.scatter(self.xpc_pointcloud, self.ypc_pointcloud, c='black', s=5 )
+		self.xps_persons = []
+		self.yps_persons = []
+		self.ids_persons = []
+		if self.display_recorded_persons:
+			self.scat5 = self.ax.scatter([], [], c='magenta', marker='^', s=50, linewidth=.5)
 
 	def getFig(self):
 		return self.fig
@@ -947,17 +966,33 @@ class AnimatedScatter:
 		self.removeTexts()
 		# self.scat = self.ax.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
 		if self.reverse_xy:
-			self.texts = createIds(yskfppl, xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
-			self.scat.set_offsets(np.column_stack((ys, xs)))
-			self.scat2.set_offsets(np.column_stack((yskf, xskf)))
-			# self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
+			# self.texts = createIds(yskfppl, xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
+			# self.scat.set_offsets(np.column_stack((ys, xs)))
+			# self.scat2.set_offsets(np.column_stack((yskf, xskf)))
+			# # self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
 			self.scat4.set_offsets(np.column_stack((self.ypc_pointcloud, self.xpc_pointcloud)))
+			if self.display_recorded_persons:
+				self.scat5.set_offsets(np.column_stack((self.yps_persons, self.xps_persons)))
+				self.texts = createIdsFromPersons(self.yps_persons, self.xps_persons, self.ids_persons, self.ax)
+			else:
+				self.texts = createIds(yskfppl, xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
+				self.scat.set_offsets(np.column_stack((ys, xs)))
+				self.scat2.set_offsets(np.column_stack((yskf, xskf)))
+				# self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
 		else:
-			self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
-			self.scat.set_offsets(np.column_stack((xs, ys)))
-			self.scat2.set_offsets(np.column_stack((xskf, yskf)))
-			# self.scat3.set_offsets(np.column_stack((xskfppl, yskfppl)))
+			# self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
+			# self.scat.set_offsets(np.column_stack((xs, ys)))
+			# self.scat2.set_offsets(np.column_stack((xskf, yskf)))
+			# # self.scat3.set_offsets(np.column_stack((xskfppl, yskfppl)))
 			self.scat4.set_offsets(np.column_stack((self.xpc_pointcloud, self.ypc_pointcloud)))
+			if self.display_recorded_persons:
+				self.scat5.set_offsets(np.column_stack((self.xps_persons, self.yps_persons)))
+				self.texts = createIdsFromPersons(self.xps_persons, self.yps_persons, self.ids_persons, self.ax)
+			else:
+				self.texts = createIds(yskfppl, xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
+				self.scat.set_offsets(np.column_stack((ys, xs)))
+				self.scat2.set_offsets(np.column_stack((yskf, xskf)))
+				# self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
 		# self.scat2 = self.ax.scatter(xkf, ykf, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
 		# plt.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
 		self.fig.canvas.draw()
@@ -972,17 +1007,33 @@ class AnimatedScatter:
 		self.removeTexts()
 		# plt.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
 		if self.reverse_xy:
-			self.texts = createIds(yskfppl, xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
-			self.scat.set_offsets(np.column_stack((ys, xs)))
-			self.scat2.set_offsets(np.column_stack((yskf, xskf)))
-			# self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
+			# self.texts = createIds(yskfppl, xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
+			# self.scat.set_offsets(np.column_stack((ys, xs)))
+			# self.scat2.set_offsets(np.column_stack((yskf, xskf)))
+			# # self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
 			self.scat4.set_offsets(np.column_stack((self.ypc_pointcloud, self.xpc_pointcloud)))
+			if self.display_recorded_persons:
+				self.scat5.set_offsets(np.column_stack((self.yps_persons, self.xps_persons)))
+				self.texts = createIdsFromPersons(self.yps_persons, self.xps_persons, self.ids_persons, self.ax)
+			else:
+				self.texts = createIds(yskfppl, xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
+				self.scat.set_offsets(np.column_stack((ys, xs)))
+				self.scat2.set_offsets(np.column_stack((yskf, xskf)))
+				# self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
 		else:
-			self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
-			self.scat.set_offsets(np.column_stack((xs, ys)))
-			self.scat2.set_offsets(np.column_stack((xskf, yskf)))
-			# self.scat3.set_offsets(np.column_stack((xskfppl, yskfppl)))
+			# self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
+			# self.scat.set_offsets(np.column_stack((xs, ys)))
+			# self.scat2.set_offsets(np.column_stack((xskf, yskf)))
+			# # self.scat3.set_offsets(np.column_stack((xskfppl, yskfppl)))
 			self.scat4.set_offsets(np.column_stack((self.xpc_pointcloud, self.ypc_pointcloud)))
+			if self.display_recorded_persons:
+				self.scat5.set_offsets(np.column_stack((self.xps_persons, self.yps_persons)))
+				self.texts = createIdsFromPersons(self.xps_persons, self.yps_persons, self.ids_persons, self.ax)
+			else:
+				self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
+				self.scat.set_offsets(np.column_stack((xs, ys)))
+				self.scat2.set_offsets(np.column_stack((xskf, yskf)))
+				# self.scat3.set_offsets(np.column_stack((xskfppl, yskfppl)))
 		# self.scat.set_color(data[2])
 		self.fig.canvas.draw()
 		if self.save_movie:
@@ -992,6 +1043,11 @@ class AnimatedScatter:
 	def setPointCloud(self,xpc, ypc):
 		self.xpc_pointcloud = xpc
 		self.ypc_pointcloud = ypc
+
+	def setPersons(self, xps, yps, ids):
+		self.xps_persons = xps
+		self.yps_persons = yps
+		self.ids_persons = ids
 
 
 CLIP_Y_MIN = 0 #1. #0.5
@@ -1062,6 +1118,12 @@ def processPointCloud(msg):
 	# display_moving_robot.setPointCloud(xps, yps)
 	display_tracker.setPointCloud(xps, yps)
 
+def processPersons(msg):
+	xps = [a.xPerson for a in msg.Persons]
+	yps = [a.yPerson for a in msg.Persons]
+	ids = [a.object_id for a in msg.Persons]
+	display_tracker.setPersons(xps, yps, ids)
+	
 
 def talker():
 	global g_pub_ppl, display_tracker, people_tracker, display_moving_robot
@@ -1070,11 +1132,13 @@ def talker():
 	rospy.Subscriber('/legs', LegMeasurementArray, processLegArray)
 	# rospy.Subscriber('/RosAria/pose', Odometry, processOdometry)
 	rospy.Subscriber('/converted_laserscan', PointCloud, processPointCloud)
-	g_pub_ppl = rospy.Publisher('/persons', PersonTrackArray, queue_size = 10)
-	display_tracker_opts = {'reverse_xy': True, 'save_movie' : True}
+	rospy.Subscriber('/persons', PersonTrackArray, processPersons)
+	# g_pub_ppl = rospy.Publisher('/persons', PersonTrackArray, queue_size = 10)
+	display_tracker_opts = {'reverse_xy': True, 'save_movie' : True, 'display_recorded_persons':True}
 	display_tracker= AnimatedScatter(display_tracker_opts)
 	# display_moving_robot = AnimatedMovingRobot(50)
-	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail, g_use_limit_ppl_predict )
+	people_tracker_opt = {'no_publish_result' : True}
+	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail, g_use_limit_ppl_predict, people_tracker_opt  )
 
 	with g_movie_writer.saving(display_tracker.getFig(), g_movie_filename, 150):
 		rospy.spin()
