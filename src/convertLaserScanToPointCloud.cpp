@@ -7,6 +7,8 @@
 laser_geometry::LaserProjection projector_;
 ros::Publisher  pub;
 
+#define REVERSE_Y_JUST_FOR_DISPLAY_ONLY 1
+
 void scanCallback(const sensor_msgs::LaserScan scan)
 {
   sensor_msgs::PointCloud::Ptr cloud(new sensor_msgs::PointCloud());
@@ -44,6 +46,13 @@ void convertScan (const sensor_msgs::LaserScan::ConstPtr& scan_in)
 {
   sensor_msgs::PointCloud cloud;
   projector_.projectLaser(*scan_in, cloud);
+#if REVERSE_Y_JUST_FOR_DISPLAY_ONLY
+  for (int i = 0; i < cloud.points.size(); i++)
+  {
+    cloud.points[i].y = - cloud.points[i].y;
+
+  }
+#endif
   pub.publish(cloud);
 }
 

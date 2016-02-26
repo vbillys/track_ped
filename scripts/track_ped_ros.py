@@ -25,7 +25,7 @@ print writer_registry.list()
 FFMpegWriter = animation.writers['ffmpeg']
 print FFMpegWriter
 g_movie_writer = FFMpegWriter(fps=10)
-g_movie_filename = "legdyn4_a.mp4"
+g_movie_filename = "legdyn1_a.mp4"
 
 g_pub_ppl = None
 #<<<<<<< Updated upstream
@@ -1044,10 +1044,10 @@ class AnimatedScatter:
 
 	def setPointCloud(self,xpc, ypc):
 		self.xpc_pointcloud = xpc
-		if self.reverse_xy:
-			self.ypc_pointcloud = [-a for a in ypc]
-		else:
-			self.ypc_pointcloud = ypc
+		# if self.reverse_xy:
+			# self.ypc_pointcloud = [-a for a in ypc]
+		# else:
+		self.ypc_pointcloud = ypc
 
 	def setPersons(self, xps, yps, ids):
 		self.xps_persons = xps
