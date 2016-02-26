@@ -25,7 +25,7 @@ print writer_registry.list()
 FFMpegWriter = animation.writers['ffmpeg']
 print FFMpegWriter
 g_movie_writer = FFMpegWriter(fps=10)
-g_movie_filename = "legdyn1_a.mp4"
+g_movie_filename = "legdyn3_a.mp4"
 
 g_pub_ppl = None
 #<<<<<<< Updated upstream
@@ -827,10 +827,11 @@ def createIdsFromPersons(xx, yy, ids, ax):
 		index = index + 1
 	return texts
 
-def createIds(xx, yy, ids, cfms, olms, ax):
+def createIds(xx, yy, ids, cfms, olms, ax, filter_out_person_data):
 	index = 0
 	texts = []
 	for _id in ids:
+		text = None
 		if olms[index] == 0:
 			if cfms[index]:
 				text = ax.text(xx[index], yy[index] + 0.3, str(_id), color='red')
@@ -839,12 +840,27 @@ def createIds(xx, yy, ids, cfms, olms, ax):
 		elif olms[index] == 1:
 			text = ax.text(xx[index], yy[index] + 0.3, str(_id), color='green')
 		elif olms[index] == 2:
-			text = ax.text(xx[index], yy[index] + 0.3, str(_id), color='blue')
+			if not filter_out_person_data:
+				text = ax.text(xx[index], yy[index] + 0.3, str(_id), color='blue')
 		elif olms[index] == 3:
-			text = ax.text(xx[index], yy[index] + 0.3, str(_id), color='yellow')
-		texts.append(text)
+			if not filter_out_person_data:
+				text = ax.text(xx[index], yy[index] + 0.3, str(_id), color='yellow')
+		if text is not None:
+			texts.append(text)
 		index = index + 1
 	return texts
+
+def filterPersonData(xx, yy, ofms):
+	_ii = 0
+	xskfppl_c = []
+	yskfppl_c = []
+	for _ofm in ofms:
+		if _ofm < 2:
+			xskfppl_c.append(xx[_ii])
+			yskfppl_c.append(yy[_ii])
+		_ii = _ii + 1
+	return xskfppl_c, yskfppl_c
+
 
 class AnimatedMovingRobot(object):
 	def __init__(self, history_cnt):
@@ -939,7 +955,10 @@ class AnimatedScatter:
 	def __init__(self, opt):
 		self.reverse_xy = opt['reverse_xy']
 		self.save_movie = opt['save_movie']
+		self.show_leg_detection = opt['show_leg_detection']
+		self.show_leg_kf = opt['show_leg_kf']
 		self.display_recorded_persons = opt['display_recorded_persons']
+		self.filter_out_person_data = opt['filter_out_person_data']
 		self.fig, self.ax = plt.subplots()
 		if self.reverse_xy:
 			self.ax.axis([-5, 5, 0, 5])
@@ -954,8 +973,10 @@ class AnimatedScatter:
 		# plt.draw()
 		# self.setup_plot()
 		# self.scat2 =  None
-		self.scat = self.ax.scatter([], [], c='blue', cmap=plt.cm.PuOr, s=128)
-		self.scat2 = self.ax.scatter([], [], c='red', cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
+		if self.show_leg_detection:
+			self.scat = self.ax.scatter([], [], c='blue', cmap=plt.cm.PuOr, s=128)
+		if self.show_leg_kf:
+			self.scat2 = self.ax.scatter([], [], c='red', cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
 		# self.scat3 = self.ax.scatter([], [], c='magenta', marker='^', s=50, linewidth=.5)
 		self.texts = []
 		self.xpc_pointcloud = []
@@ -966,6 +987,8 @@ class AnimatedScatter:
 		self.ids_persons = []
 		if self.display_recorded_persons:
 			self.scat5 = self.ax.scatter([], [], c='magenta', marker='^', s=50, linewidth=.5)
+		else:
+			self.scat3 = self.ax.scatter([], [], c='magenta', marker='^', s=50, linewidth=.5)
 
 	def getFig(self):
 		return self.fig
@@ -992,10 +1015,16 @@ class AnimatedScatter:
 				self.scat5.set_offsets(np.column_stack(([-a for a in self.yps_persons], self.xps_persons)))
 				self.texts = createIdsFromPersons([-a for a in self.yps_persons], self.xps_persons, self.ids_persons, self.ax)
 			else:
-				self.texts = createIds([-a for a in self.yps_persons], xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
-				self.scat.set_offsets(np.column_stack(([-a for a in ys], xs)))
-				self.scat2.set_offsets(np.column_stack(([-a for a in yskf], xskf)))
-				# self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
+				self.texts = createIds([-a for a in yskfppl], xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax, self.filter_out_person_data)
+				if self.show_leg_detection:
+					self.scat.set_offsets(np.column_stack(([-a for a in ys], xs)))
+				if self.show_leg_kf:
+					self.scat2.set_offsets(np.column_stack(([-a for a in yskf], xskf)))
+				if self.filter_out_person_data:
+					xskfppl_c, yskfppl_c = filterPersonData(xskfppl, yskfppl, data_kf_ppl_olm)
+					self.scat3.set_offsets(np.column_stack(([-a for a in yskfppl_c], xskfppl_c)))
+				else:
+					self.scat3.set_offsets(np.column_stack(([-a for a in yskfppl], xskfppl)))
 		else:
 			# self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
 			# self.scat.set_offsets(np.column_stack((xs, ys)))
@@ -1006,10 +1035,16 @@ class AnimatedScatter:
 				self.scat5.set_offsets(np.column_stack((self.xps_persons, self.yps_persons)))
 				self.texts = createIdsFromPersons(self.xps_persons, self.yps_persons, self.ids_persons, self.ax)
 			else:
-				self.texts = createIds(yskfppl, xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
-				self.scat.set_offsets(np.column_stack((ys, xs)))
-				self.scat2.set_offsets(np.column_stack((yskf, xskf)))
-				# self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
+				self.texts = createIds(yskfppl, xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax, self.filter_out_person_data)
+				if self.show_leg_detection:
+					self.scat.set_offsets(np.column_stack((ys, xs)))
+				if self.show_leg_kf:
+					self.scat2.set_offsets(np.column_stack((yskf, xskf)))
+				if self.filter_out_person_data:
+					xskfppl_c, yskfppl_c = filterPersonData(xskfppl, yskfppl, data_kf_ppl_olm)
+					self.scat3.set_offsets(np.column_stack((xskfppl_c, yskfppl_c)))
+				else:
+					self.scat3.set_offsets(np.column_stack((xskfppl, yskfppl)))
 		# self.scat2 = self.ax.scatter(xkf, ykf, c=ct, animated=True, cmap=plt.cm.coolwarm, s=256, marker='+', linewidth=2)
 		# plt.scatter(xs, ys, c='blue', cmap=plt.cm.PuOr, s=128)
 		self.fig.canvas.draw()
@@ -1034,10 +1069,16 @@ class AnimatedScatter:
 				self.scat5.set_offsets(np.column_stack(([-a for a in self.yps_persons], self.xps_persons)))
 				self.texts = createIdsFromPersons([-a for a in self.yps_persons], self.xps_persons, self.ids_persons, self.ax)
 			else:
-				self.texts = createIds([-a for a in self.yps_persons], xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
-				self.scat.set_offsets(np.column_stack(([-a for a in ys], xs)))
-				self.scat2.set_offsets(np.column_stack(([-a for a in yskf], xskf)))
-				# self.scat3.set_offsets(np.column_stack((yskfppl, xskfppl)))
+				self.texts = createIds([-a for a in yskfppl], xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax, self.filter_out_person_data)
+				if self.show_leg_detection:
+					self.scat.set_offsets(np.column_stack(([-a for a in ys], xs)))
+				if self.show_leg_kf:
+					self.scat2.set_offsets(np.column_stack(([-a for a in yskf], xskf)))
+				if self.filter_out_person_data:
+					xskfppl_c, yskfppl_c = filterPersonData(xskfppl, yskfppl, data_kf_ppl_olm)
+					self.scat3.set_offsets(np.column_stack(([-a for a in yskfppl_c], xskfppl_c)))
+				else:
+					self.scat3.set_offsets(np.column_stack(([-a for a in yskfppl], xskfppl)))
 		else:
 			# self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
 			# self.scat.set_offsets(np.column_stack((xs, ys)))
@@ -1048,10 +1089,16 @@ class AnimatedScatter:
 				self.scat5.set_offsets(np.column_stack((self.xps_persons, self.yps_persons)))
 				self.texts = createIdsFromPersons(self.xps_persons, self.yps_persons, self.ids_persons, self.ax)
 			else:
-				self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
-				self.scat.set_offsets(np.column_stack((xs, ys)))
-				self.scat2.set_offsets(np.column_stack((xskf, yskf)))
-				# self.scat3.set_offsets(np.column_stack((xskfppl, yskfppl)))
+				self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax, self.filter_out_person_data)
+				if self.show_leg_detection:
+					self.scat.set_offsets(np.column_stack((xs, ys)))
+				if self.show_leg_kf:
+					self.scat2.set_offsets(np.column_stack((xskf, yskf)))
+				if self.filter_out_person_data:
+					xskfppl_c, yskfppl_c = filterPersonData(xskfppl, yskfppl, data_kf_ppl_olm)
+					self.scat3.set_offsets(np.column_stack((xskfppl_c, yskfppl_c)))
+				else:
+					self.scat3.set_offsets(np.column_stack((xskfppl, yskfppl)))
 		# self.scat.set_color(data[2])
 		self.fig.canvas.draw()
 		if self.save_movie:
@@ -1155,10 +1202,10 @@ def talker():
 	rospy.Subscriber('/converted_laserscan', PointCloud, processPointCloud)
 	rospy.Subscriber('/persons', PersonTrackArray, processPersons)
 	# g_pub_ppl = rospy.Publisher('/persons', PersonTrackArray, queue_size = 10)
-	display_tracker_opts = {'reverse_xy': True, 'save_movie' : True, 'display_recorded_persons':True}
+	display_tracker_opts = {'reverse_xy': True, 'save_movie' : True, 'display_recorded_persons':False, 'show_leg_kf':False, 'show_leg_detection':False, 'filter_out_person_data':True}
 	display_tracker= AnimatedScatter(display_tracker_opts)
 	# display_moving_robot = AnimatedMovingRobot(50)
-	people_tracker_opt = {'no_publish_result' : True, 'display_recorded_only':True}
+	people_tracker_opt = {'no_publish_result' : True, 'display_recorded_only':False}
 	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail, g_use_limit_ppl_predict, people_tracker_opt  )
 
 	with g_movie_writer.saving(display_tracker.getFig(), g_movie_filename, 150):
