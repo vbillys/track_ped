@@ -26,7 +26,7 @@ print writer_registry.list()
 FFMpegWriter = animation.writers['ffmpeg']
 print FFMpegWriter
 g_movie_writer = FFMpegWriter(fps=6.7)
-g_movie_filename = "legdyn5_a.mp4"
+g_movie_filename = "legdyn3_ar.mp4"
 
 g_pub_ppl = None
 #<<<<<<< Updated upstream
@@ -1035,19 +1035,19 @@ class AnimatedScatter:
 			# self.scat4.set_offsets(np.column_stack(([-a for a in self.ypc_pointcloud], self.xpc_pointcloud)))
 			self.scat4.set_offsets(np.column_stack((self.ypc_pointcloud, self.xpc_pointcloud)))
 			if self.display_recorded_persons:
-				self.scat5.set_offsets(np.column_stack(([-a for a in self.yps_persons], self.xps_persons)))
-				self.texts = createIdsFromPersons([-a for a in self.yps_persons], self.xps_persons, self.ids_persons, self.ax)
+				self.scat5.set_offsets(np.column_stack(([a for a in self.yps_persons], self.xps_persons)))
+				self.texts = createIdsFromPersons([a for a in self.yps_persons], self.xps_persons, self.ids_persons, self.ax)
 			else:
-				self.texts = createIds([-a for a in yskfppl], xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax, self.filter_out_person_data)
+				self.texts = createIds([a for a in yskfppl], xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax, self.filter_out_person_data)
 				if self.show_leg_detection:
-					self.scat.set_offsets(np.column_stack(([-a for a in ys], xs)))
+					self.scat.set_offsets(np.column_stack(([a for a in ys], xs)))
 				if self.show_leg_kf:
-					self.scat2.set_offsets(np.column_stack(([-a for a in yskf], xskf)))
+					self.scat2.set_offsets(np.column_stack(([a for a in yskf], xskf)))
 				if self.filter_out_person_data:
 					xskfppl_c, yskfppl_c = filterPersonData(xskfppl, yskfppl, data_kf_ppl_olm)
-					self.scat3.set_offsets(np.column_stack(([-a for a in yskfppl_c], xskfppl_c)))
+					self.scat3.set_offsets(np.column_stack(([a for a in yskfppl_c], xskfppl_c)))
 				else:
-					self.scat3.set_offsets(np.column_stack(([-a for a in yskfppl], xskfppl)))
+					self.scat3.set_offsets(np.column_stack(([a for a in yskfppl], xskfppl)))
 		else:
 			# self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
 			# self.scat.set_offsets(np.column_stack((xs, ys)))
@@ -1089,19 +1089,19 @@ class AnimatedScatter:
 			# self.scat4.set_offsets(np.column_stack(([-a for a in self.ypc_pointcloud], self.xpc_pointcloud)))
 			self.scat4.set_offsets(np.column_stack((self.ypc_pointcloud, self.xpc_pointcloud)))
 			if self.display_recorded_persons:
-				self.scat5.set_offsets(np.column_stack(([-a for a in self.yps_persons], self.xps_persons)))
-				self.texts = createIdsFromPersons([-a for a in self.yps_persons], self.xps_persons, self.ids_persons, self.ax)
+				self.scat5.set_offsets(np.column_stack(([a for a in self.yps_persons], self.xps_persons)))
+				self.texts = createIdsFromPersons([a for a in self.yps_persons], self.xps_persons, self.ids_persons, self.ax)
 			else:
-				self.texts = createIds([-a for a in yskfppl], xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax, self.filter_out_person_data)
+				self.texts = createIds([a for a in yskfppl], xskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax, self.filter_out_person_data)
 				if self.show_leg_detection:
-					self.scat.set_offsets(np.column_stack(([-a for a in ys], xs)))
+					self.scat.set_offsets(np.column_stack(([a for a in ys], xs)))
 				if self.show_leg_kf:
-					self.scat2.set_offsets(np.column_stack(([-a for a in yskf], xskf)))
+					self.scat2.set_offsets(np.column_stack(([a for a in yskf], xskf)))
 				if self.filter_out_person_data:
 					xskfppl_c, yskfppl_c = filterPersonData(xskfppl, yskfppl, data_kf_ppl_olm)
-					self.scat3.set_offsets(np.column_stack(([-a for a in yskfppl_c], xskfppl_c)))
+					self.scat3.set_offsets(np.column_stack(([a for a in yskfppl_c], xskfppl_c)))
 				else:
-					self.scat3.set_offsets(np.column_stack(([-a for a in yskfppl], xskfppl)))
+					self.scat3.set_offsets(np.column_stack(([a for a in yskfppl], xskfppl)))
 		else:
 			# self.texts = createIds(xskfppl, yskfppl, data_kf_ppl, data_kf_ppl_cfm, data_kf_ppl_olm, self.ax)
 			# self.scat.set_offsets(np.column_stack((xs, ys)))
