@@ -8,6 +8,9 @@ laser_geometry::LaserProjection projector_;
 ros::Publisher  pub;
 
 #define REVERSE_Y_JUST_FOR_DISPLAY_ONLY 1
+#define FILTER_OUT_SENSOR_DATA 1
+#define FILTER_RADIUS .5
+
 
 void scanCallback(const sensor_msgs::LaserScan scan)
 {
@@ -53,7 +56,36 @@ void convertScan (const sensor_msgs::LaserScan::ConstPtr& scan_in)
 
   }
 #endif
+#if FILTER_OUT_SENSOR_DATA
+  sensor_msgs::PointCloud cloud_f;
+  cloud_f.header = cloud.header;
+  cloud_f.channels = cloud.channels;
+  int _bef = cloud.points.size();
+  for (int i = 0; i < cloud.points.size(); i++)
+  {
+    float x = cloud.points[i].x;
+    float y = cloud.points[i].y;
+    if (x*x + y*y > FILTER_RADIUS*FILTER_RADIUS)
+    {
+      //cloud.points.erase(cloud.points.begin()+i);
+      //cloud.channels.erase(cloud.channels.begin()+i);
+      //std::cout << x << " " << y << std::endl;
+      geometry_msgs::Point32 point_new;
+      point_new.x = x;
+      point_new.y = y;
+      point_new.z = 0;
+      cloud_f.points.push_back(point_new);
+    }
+
+  }
+  //std::cout << _bef << " " << cloud_f.points.size() << " " << cloud.channels.size() << std::endl;
+
+#endif
+#if FILTER_OUT_SENSOR_DATA
+  pub.publish(cloud_f);
+#else
   pub.publish(cloud);
+#endif
 }
 
 
