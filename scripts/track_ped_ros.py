@@ -17,6 +17,7 @@ import pylab as plt
 # import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
+import matplotlib.patches as mpatches
 
 from CustomCreateKF import createLegKF, createPersonKF, squareMatrix
 
@@ -24,8 +25,8 @@ writer_registry = animation.MovieWriterRegistry()
 print writer_registry.list()
 FFMpegWriter = animation.writers['ffmpeg']
 print FFMpegWriter
-g_movie_writer = FFMpegWriter(fps=10)
-g_movie_filename = "legdyn3_a.mp4"
+g_movie_writer = FFMpegWriter(fps=6.7)
+g_movie_filename = "legdyn5_a.mp4"
 
 g_pub_ppl = None
 #<<<<<<< Updated upstream
@@ -962,6 +963,7 @@ class AnimatedScatter:
 		self.fig, self.ax = plt.subplots()
 		if self.reverse_xy:
 			self.ax.axis([-5, 5, 0, 5])
+			self.ax.invert_xaxis()
 		else:
 			self.ax.axis([0, 6, -10, 10])
 		self.ax.set_aspect('equal','datalim')
@@ -981,7 +983,7 @@ class AnimatedScatter:
 		self.texts = []
 		self.xpc_pointcloud = []
 		self.ypc_pointcloud = []
-		self.scat4 = self.ax.scatter(self.xpc_pointcloud, self.ypc_pointcloud, c='black', s=5 )
+		self.scat4 = self.ax.scatter(self.xpc_pointcloud, self.ypc_pointcloud, c='blue', s=5, lw=0 )
 		self.xps_persons = []
 		self.yps_persons = []
 		self.ids_persons = []
@@ -989,6 +991,27 @@ class AnimatedScatter:
 			self.scat5 = self.ax.scatter([], [], c='magenta', marker='^', s=50, linewidth=.5)
 		else:
 			self.scat3 = self.ax.scatter([], [], c='magenta', marker='^', s=50, linewidth=.5)
+		#draw arrows and robot label, and also legends
+		self.ax.arrow(0, 0, 0., 0.5, head_width=0.05, head_length=0.1, fc='k', ec='k')
+		self.ax.arrow(0, 0, 0.5, 0, head_width=0.05, head_length=0.1, fc='k', ec='k')
+		self.ax.text(-0.05,0.08,'Sensor \nOrigin', fontsize=9)
+		self.ax.text(-0.05,0.5,'y(m)', fontsize=7)
+		self.ax.text(0.5,0.08,'x(m)', fontsize=7)
+
+		red_patch = mpatches.Patch(color='red', label='Red numbers: object id of a confirmed person object')
+		green_patch = mpatches.Patch(color='green', label='Green numbers: object id of a person object but with only one leg detection')
+		black_patch= mpatches.Patch(color='black', label='Black numbers: object id of a yet-to-be confirmed person object')
+		# red_patch = plt.text(0,0,'1..n',color='red', label='Red numbers: object id of a confirmed person object')
+		# green_patch = plt.text(0,0,'1..n',color='green', label='Green numbers: object id of a person object but with only one leg detection')
+		# black_patch= plt.text(0,0,'1..n',color='black', label='Black numbers: object id of a yet-to-be confirmed person object')
+		magenta_scatter = plt.scatter([], [], c='magenta', marker='^', s=50, linewidth=.5, label='Location of tracked person object(s)')
+		black_scatter = plt.scatter([], [], c='blue', s=5, label='Laser scan data' , lw=0)
+		# plt.legend(handles=[red_patch])
+		# self.legend = plt.legend(loc='upper left', shadow=True, fontsize='x-small', handles=[red_patch, green_patch, black_patch, magenta_scatter,black_scatter])
+		# self.legend = plt.legend(bbox_to_anchor=(1.05, 1),  borderaxespad=0.,loc=2, shadow=True, fontsize='x-large', handles=[red_patch, green_patch, black_patch, magenta_scatter,black_scatter])
+		# plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+		# Put a nicer background color on the legend.
+		# self.legend.get_frame().set_facecolor('#00FFCC')
 
 	def getFig(self):
 		return self.fig

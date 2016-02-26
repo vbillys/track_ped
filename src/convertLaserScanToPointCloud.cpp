@@ -7,7 +7,7 @@
 laser_geometry::LaserProjection projector_;
 ros::Publisher  pub;
 
-#define REVERSE_Y_JUST_FOR_DISPLAY_ONLY 1
+#define REVERSE_Y_JUST_FOR_DISPLAY_ONLY 0
 #define FILTER_OUT_SENSOR_DATA 1
 #define FILTER_RADIUS .5
 
@@ -97,6 +97,7 @@ int main(int argc, char** argv)
   //ros::Subscriber sub = nh.subscribe ("scan_base/scan", 1 , scanCallback);
   pub = nh.advertise<sensor_msgs::PointCloud>( "converted_laserscan", 1);
 
-  while (ros::ok()){ros::spinOnce();}//ROS_INFO_STREAM("Hello, world!");r.sleep();}
+  ros::Rate rate = ros::Rate(20);
+  while (ros::ok()){ros::spinOnce();rate.sleep();}//ROS_INFO_STREAM("Hello, world!");r.sleep();}
   return 0;
 }
