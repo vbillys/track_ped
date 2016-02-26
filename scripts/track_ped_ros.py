@@ -157,6 +157,7 @@ class PeopleTrackerFromLegs:
 	def __init__(self, display, pub_persons, use_display, use_decay_when_nodata, use_raw_leg_data, no_ppl_predict_when_update_fail,use_limit_ppl_predict, opt ):
 		self.use_display = use_display
 		self.no_publish_result = opt['no_publish_result']
+		self.display_recorded_only = opt['display_recorded_only']
 		self.use_decay_when_nodata = use_decay_when_nodata
 		self.no_ppl_predict_when_update_fail = no_ppl_predict_when_update_fail
 		self.use_limit_ppl_predict = use_limit_ppl_predict
@@ -196,9 +197,22 @@ class PeopleTrackerFromLegs:
 		self.points = points
 		# munkres = Munkres()
 		# print frame
+		if self.display_recorded_only:
+			if len(frame)>0:
+				if self.use_display:
+					if not self._first_leg:
+						# print 'setup plot'
+						self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations, self.track_KF_onelegmode)
+					else:
+						# print 'update plot'
+						self.display.update(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations, self.track_KF_onelegmode)
+				if not self._first_leg:
+					self._first_leg = True
+			return
+
 		if len(frame)>0:
 			if not self._first_leg:
-				self._first_leg = True
+				# self._first_leg = True
 				# track = []
 				# track_conf = []
 				# track_KF_point = []
@@ -365,6 +379,8 @@ class PeopleTrackerFromLegs:
 					self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations, self.track_KF_onelegmode)
 				else:
 					self.display.update(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations, self.track_KF_onelegmode)
+			if not self._first_leg:
+				self._first_leg = True
 		else:
 			# print 'Skipping frame %d, empty data, may not real time' % (_frame_idx)
 			if self.use_decay_when_nodata:
@@ -1142,7 +1158,7 @@ def talker():
 	display_tracker_opts = {'reverse_xy': True, 'save_movie' : True, 'display_recorded_persons':True}
 	display_tracker= AnimatedScatter(display_tracker_opts)
 	# display_moving_robot = AnimatedMovingRobot(50)
-	people_tracker_opt = {'no_publish_result' : True}
+	people_tracker_opt = {'no_publish_result' : True, 'display_recorded_only':True}
 	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail, g_use_limit_ppl_predict, people_tracker_opt  )
 
 	with g_movie_writer.saving(display_tracker.getFig(), g_movie_filename, 150):
