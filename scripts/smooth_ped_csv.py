@@ -335,15 +335,15 @@ def plotPoints(data, target_data, subtitle, fig_index):
 	for target in target_data.targets:
 		ppl_x = [x[0] for x in target]
 		ppl_y = [x[1] for x in target]
-		# if _index_target != 0:
-		if _index_target != 0 and _index_target != 1:
+		if _index_target != 0:
+		# if _index_target != 0 and _index_target != 1:
 			plt.plot(ppl_x, ppl_y,color = g_colors[_index_target], label = "Other tracked target trajectory")
 		else:
-			# plt.plot(ppl_x, ppl_y,color = 'blue', label = "Tracked target trajectory \n (of interest)")
-			if _index_target == 0:
-				plt.plot(ppl_x, ppl_y,color = 'blue', label = "First Tracked target trajectory \n (of interest)")
-			else:
-				plt.plot(ppl_x, ppl_y,color = g_colors[_index_target], label = " Second Tracked target trajectory \n (of interest)")
+			plt.plot(ppl_x, ppl_y,color = 'blue', label = "Tracked target trajectory \n (of interest)")
+			# if _index_target == 0:
+				# plt.plot(ppl_x, ppl_y,color = 'blue', label = "First Tracked target trajectory \n (of interest)")
+			# else:
+				# plt.plot(ppl_x, ppl_y,color = g_colors[_index_target], label = " Second Tracked target trajectory \n (of interest)")
 		_index_target = _index_target + 1
 	two_x = []
 	two_y = []
@@ -378,13 +378,15 @@ def plotPoints(data, target_data, subtitle, fig_index):
 	
 	if fig_index == 1:
 		plt.plot([1.54542264635-0.27, 1.9049684261-.27], [-5, 5], linestyle='--', color='red', label="Ground Truth")
-		plt.plot([1.54542264635+0.24, 1.9049684261+.24], [-5, 5], linestyle='--', color='red')
-		# plt.legend(bbox_to_anchor=(1.15, 1), loc=2, borderaxespad=0.,prop={'size':10})
+		# plt.plot([1.54542264635-0.27, 1.9049684261-.27], [-5, 5], linestyle='--', color='red', label="Ground Truth")
+		# plt.plot([1.54542264635+0.24, 1.9049684261+.24], [-5, 5], linestyle='--', color='red')
+		# # plt.legend(bbox_to_anchor=(1.15, 1), loc=2, borderaxespad=0.,prop={'size':10})
 	else:
-		# plt.plot([1.54542264635, 1.9049684261], [-5, 5], linestyle='--', color='red', label="Ground Truth")
-		plt.plot([1.54542264635-0.27, 1.9049684261-.27], [-5, 5], linestyle='--', color='red', label="Ground Truth")
-		plt.plot([1.54542264635+0.24, 1.9049684261+.24], [-5, 5], linestyle='--', color='red')
-		plt.legend(bbox_to_anchor=(-1.70, 1), loc=2, borderaxespad=0.,prop={'size':10})
+		plt.plot([1.54542264635, 1.9049684261], [-5, 5], linestyle='--', color='red', label="Ground Truth")
+		# # plt.plot([1.54542264635, 1.9049684261], [-5, 5], linestyle='--', color='red', label="Ground Truth")
+		# plt.plot([1.54542264635-0.27, 1.9049684261-.27], [-5, 5], linestyle='--', color='red', label="Ground Truth")
+		# plt.plot([1.54542264635+0.24, 1.9049684261+.24], [-5, 5], linestyle='--', color='red')
+		# # plt.legend(bbox_to_anchor=(-1.70, 1), loc=2, borderaxespad=0.,prop={'size':10})
 	# ax.set_aspect('equal','datalim')
 	# figure = plt.gcf()
 	# plt.subplots_adjust(left = (5/25.4)/figure.xsize, bottom = (4/25.4)/figure.ysize, right = 1 - (1/25.4)/figure.xsize, top = 1 - (3/25.4)/figure.ysize)
@@ -424,33 +426,33 @@ plt.rc('text', usetex = True)
 plt.rc('font', family='serif')
 
 processed_data1, target_data1 = getProcessedAndTargetDataFromFile('processed_data_1paper.csv')
-# # plt.subplot(2,2,1)
-# # plt.axes([0.1,.55,0.38,0.4])
-# plt.axes([0.01,.09,0.40,0.85])
-# plotPoints(processed_data1, target_data1, "(a)", 1)
+# plt.subplot(2,2,1)
+# plt.axes([0.1,.55,0.38,0.4])
+plt.axes([-0.20,.09,0.87,0.85])
+plotPoints(processed_data1, target_data1, "(non-cluttered)", 1)
 
 processed_data2, target_data2 = getProcessedAndTargetDataFromFile('processed_data_2paper.csv')
-# plt.subplot(2,2,2)
-# plt.axes([0.56,.55,0.38,0.4])
-plt.axes([0.01,.09,0.40,0.85])
-plotPoints(processed_data2, target_data2, "(a)", 1)
+# # plt.subplot(2,2,2)
+# # plt.axes([0.56,.55,0.38,0.4])
+# plt.axes([-0.2,.09,0.87,0.85])
+# plotPoints(processed_data2, target_data2, "(non-cluttered)", 1)
 
 processed_data3, target_data3 = getProcessedAndTargetDataFromFile('processed_data_3paper.csv')
-# # plt.subplot(2,2,3)
-# plt.axes([0.60,.09,0.40,0.85])
-# plotPoints(processed_data3, target_data3, "(b)", 2)
+# plt.subplot(2,2,3)
+plt.axes([0.20,.09,0.87,0.85])
+plotPoints(processed_data3, target_data3, "(cluttered)", 2)
 
 processed_data4, target_data4 = getProcessedAndTargetDataFromFile('processed_data_4paper.csv')
-# plt.subplot(2,2,4)
-# plt.axes([0.56,.09,0.38,0.4])
-plt.axes([0.60,.09,0.40,0.85])
-plotPoints(processed_data4, target_data4, "(b)", 2)
+# # plt.subplot(2,2,4)
+# # plt.axes([0.56,.09,0.38,0.4])
+# plt.axes([0.20,.09,0.87,0.85])
+# plotPoints(processed_data4, target_data4, "(cluttered)", 2)
 
 # plt.tight_layout(pad=2.0)
 # plt.gcf().set_size_inches(3.5,6.5)
-plt.gcf().set_size_inches(8.0,4.5)
+plt.gcf().set_size_inches(6.0,4.5)
 
-filename_save = 'occluded2'
+filename_save = 'occluded'
 plt.savefig(filename_save + '.pdf')
 plt.savefig(filename_save + '.eps')
 plt.savefig(filename_save + '.svg')
