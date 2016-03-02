@@ -9,14 +9,22 @@ import numpy as np
 import pylab as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
+import matplotlib.ticker as ticker
+
+import pickle as pl
+import brewer2mpl
+
+# brewer2mpl.get_map args: set name  set type  number of colors
+bmap = brewer2mpl.get_map('Set2', 'qualitative', 7)
+g_colors = bmap.mpl_colors
 
 # f_handle = open('processed_data_5.csv','r')
 # f_handle = open('processed_data_8sim.csv','r')
-# f_handle = open('processed_data_1paper.csv','r')
+f_handle = open('processed_data_1paper.csv','r')
 # f_handle = open('processed_data_2paper.csv','r')
 # f_handle = open('processed_data_3paper.csv','r')
 # f_handle = open('processed_data_4paper.csv','r')
-f_handle = open('processed_data_5paper.csv','r')
+# f_handle = open('processed_data_5paper.csv','r')
 # f_handle = open('processed_data_6paper.csv','r')
 
 def namedlist(typename, field_names):
@@ -319,14 +327,23 @@ class ContTracking:
 		# no ERegPrime as local minimization only changes state of points and not changing (adding / removing) new/old points
 		return self.e_obs_prime + EDYN_WEIGHT*self.e_dyn_prime + EEXC_WEIGHT*self.e_exc_prime + EPER_WEIGHT*self.e_per_prime
 
-def plotPoints(data, target_data):
-	ax = plt.axes()
+def plotPoints(data, target_data, subtitle, fig_index):
+	# ax = plt.axes()
+	ax = plt.gca()
 	colors = cm.rainbow(np.linspace(0, 1, target_data.max_target_id))
 	_index_target = 0
 	for target in target_data.targets:
 		ppl_x = [x[0] for x in target]
 		ppl_y = [x[1] for x in target]
-		plt.plot(ppl_x, ppl_y,color = colors[_index_target])
+		# if _index_target != 0:
+		if _index_target != 0 and _index_target != 1:
+			plt.plot(ppl_x, ppl_y,color = g_colors[_index_target], label = "Other tracked target trajectory")
+		else:
+			# plt.plot(ppl_x, ppl_y,color = 'blue', label = "Tracked target trajectory \n (of interest)")
+			if _index_target == 0:
+				plt.plot(ppl_x, ppl_y,color = 'blue', label = "First Tracked target trajectory \n (of interest)")
+			else:
+				plt.plot(ppl_x, ppl_y,color = g_colors[_index_target], label = " Second Tracked target trajectory \n (of interest)")
 		_index_target = _index_target + 1
 	two_x = []
 	two_y = []
@@ -338,28 +355,113 @@ def plotPoints(data, target_data):
 	for oneleg in data.oneleg:
 		one_x = one_x + [x[1] for x in oneleg]
 		one_y = one_y + [x[2] for x in oneleg]
-	ax.scatter(two_x+one_x, two_y+one_y, color='grey', s=48)
-	ax.xaxis.grid(True, which="major", linestyle='dotted')
-	ax.yaxis.grid(True, which="major", linestyle='dotted')
+	ax.scatter(two_x+one_x, two_y+one_y, color='grey', s=18, alpha=.5, label="Identified Leg Positions")
+	# ax.xaxis.grid(True, which="major", linestyle='dotted')
+	# ax.yaxis.grid(True, which="major", linestyle='dotted')
+
+
+	ax.text(.45,-.075,subtitle, horizontalalignment='center', transform=ax.transAxes, fontsize=8)
+
+	# ax.set_xlabel(subtitle, fontsize=8)  
+	ax.set_xlabel(r'$x(m)$', fontsize=8)  
+	ax.set_ylabel(r'$y(m)$', fontsize=8)  
+	ax.xaxis.set_label_coords(1.15,-0.025)
+	ax.yaxis.set_label_coords(-0.15,0.5)
+	plt.setp(ax.get_xticklabels(), fontsize=10)
+	plt.setp(ax.get_yticklabels(), fontsize=10)
+	# plt.xlabel(r'\textsc{Sensor Y axis}')  
+	# plt.ylabel(r'\textsc{Sensor X axis}')
+	
 	# ax.axis([0, 10, -10, 10])
 	# ax.axis('equal')
-	ax.axis([0, 5, -5, 5])
-	ax.set_aspect('equal','datalim')
-	# plt.plot([1.616998, 1.787815], [-3.009284, 1.741627])
-	plt.plot([1.54542264635, 1.9049684261], [-5, 5])
-	plt.show()
+	# ax.axis([0, 5, -5, 5])
+	
+	if fig_index == 1:
+		plt.plot([1.54542264635-0.27, 1.9049684261-.27], [-5, 5], linestyle='--', color='red', label="Ground Truth")
+		plt.plot([1.54542264635+0.24, 1.9049684261+.24], [-5, 5], linestyle='--', color='red')
+		# plt.legend(bbox_to_anchor=(1.15, 1), loc=2, borderaxespad=0.,prop={'size':10})
+	else:
+		# plt.plot([1.54542264635, 1.9049684261], [-5, 5], linestyle='--', color='red', label="Ground Truth")
+		plt.plot([1.54542264635-0.27, 1.9049684261-.27], [-5, 5], linestyle='--', color='red', label="Ground Truth")
+		plt.plot([1.54542264635+0.24, 1.9049684261+.24], [-5, 5], linestyle='--', color='red')
+		plt.legend(bbox_to_anchor=(-1.70, 1), loc=2, borderaxespad=0.,prop={'size':10})
+	# ax.set_aspect('equal','datalim')
+	# figure = plt.gcf()
+	# plt.subplots_adjust(left = (5/25.4)/figure.xsize, bottom = (4/25.4)/figure.ysize, right = 1 - (1/25.4)/figure.xsize, top = 1 - (3/25.4)/figure.ysize)
+	ax.set_aspect('equal','box')
+	# ax('scaling')
+	# ax.set_autoscale_on(False)
+	plt.ylim(-4,4)
+	plt.xlim(0,3.5)
 
-processed_data =  readProcessedData(f_handle)
-target_data = gatherPeopleTracks(processed_data)
+	start, end = ax.get_xlim()
+	ax.xaxis.set_ticks(np.arange(start, end, 1.0))
+	ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('$%1.0f$'))
+	# plt.gcf().tight_layout()
+
+	# plt.plot([1.616998, 1.787815], [-3.009284, 1.741627])
+	# plt.savefig('occluded.pdf')
+	# plt.savefig('occluded.eps')
+	# plt.savefig('occluded.svg')
+	# pl.dump(plt.gcf(), file('fig1.pickle','w'))
+	# plt.show()
+
+def getProcessedAndTargetDataFromFile(filename):
+	f_handle = open(filename,'r')
+	processed_data =  readProcessedData(f_handle)
+	target_data = gatherPeopleTracks(processed_data)
+	return processed_data, target_data
+
+# processed_data =  readProcessedData(f_handle)
+# target_data = gatherPeopleTracks(processed_data)
 # targets, targets_ids = gatherPeopleTracks(processed_data)
 # print target_data.targets_modes
 
-plotPoints(processed_data, target_data)
+# processed_data, target_data = getProcessedAndTargetDataFromFile('processed_data_1paper.csv')
+# plotPoints(processed_data, target_data)
+
+plt.rc('text', usetex = True)
+plt.rc('font', family='serif')
+
+processed_data1, target_data1 = getProcessedAndTargetDataFromFile('processed_data_1paper.csv')
+# # plt.subplot(2,2,1)
+# # plt.axes([0.1,.55,0.38,0.4])
+# plt.axes([0.01,.09,0.40,0.85])
+# plotPoints(processed_data1, target_data1, "(a)", 1)
+
+processed_data2, target_data2 = getProcessedAndTargetDataFromFile('processed_data_2paper.csv')
+# plt.subplot(2,2,2)
+# plt.axes([0.56,.55,0.38,0.4])
+plt.axes([0.01,.09,0.40,0.85])
+plotPoints(processed_data2, target_data2, "(a)", 1)
+
+processed_data3, target_data3 = getProcessedAndTargetDataFromFile('processed_data_3paper.csv')
+# # plt.subplot(2,2,3)
+# plt.axes([0.60,.09,0.40,0.85])
+# plotPoints(processed_data3, target_data3, "(b)", 2)
+
+processed_data4, target_data4 = getProcessedAndTargetDataFromFile('processed_data_4paper.csv')
+# plt.subplot(2,2,4)
+# plt.axes([0.56,.09,0.38,0.4])
+plt.axes([0.60,.09,0.40,0.85])
+plotPoints(processed_data4, target_data4, "(b)", 2)
+
+# plt.tight_layout(pad=2.0)
+# plt.gcf().set_size_inches(3.5,6.5)
+plt.gcf().set_size_inches(8.0,4.5)
+
+filename_save = 'occluded2'
+plt.savefig(filename_save + '.pdf')
+plt.savefig(filename_save + '.eps')
+plt.savefig(filename_save + '.svg')
+
+# plt.show()
+
 
 # print target_data.targets, target_data.targets_ids
 # print targets, targets_ids
 
-cont_tracking = ContTracking(processed_data, target_data)
-print cont_tracking.computeEnergy(), cont_tracking.computeEnergyPrime()
+# cont_tracking = ContTracking(processed_data, target_data)
+# print cont_tracking.computeEnergy(), cont_tracking.computeEnergyPrime()
 
 
