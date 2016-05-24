@@ -1,11 +1,11 @@
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise, dot3
 import numpy as np
-def createPersonKF(x,y):
+def createPersonKF(x,y, dt, dt2):
 	kalman_filter = KalmanFilter(dim_x=6, dim_z=2)
 	# kalman_filter = KalmanFilter(dim_x=4, dim_z=4)
-	dt = .1
-	dt2= .005
+	# dt = .1
+	# dt2= .005
 	# KF_F = np.array([[1., dt, 0 ,  0],
 		# [0 , 1., 0 ,  0],
 		# [0 , 0 , 1., dt],
@@ -42,10 +42,10 @@ def createPersonKF(x,y):
 
 	return kalman_filter
 
-def createLegKF(x,y):
+def createLegKF(x,y, dt):
 	# kalman_filter = KalmanFilter(dim_x=4, dim_z=2)
 	kalman_filter = KalmanFilter(dim_x=4, dim_z=4)
-	dt = .1
+	# dt = .1
 	KF_F = np.array([[1., dt, 0 ,  0],
 		[0 , 1., 0 ,  0],
 		[0 , 0 , 1., dt],

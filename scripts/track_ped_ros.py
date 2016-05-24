@@ -14,12 +14,16 @@ import pylab as plt
 # import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.animation as animation
+from visualization_msgs.msg import MarkerArray
+from visualization_msgs.msg import Marker
+from geometry_msgs.msg import Point
 
 from CustomCreateKF import createLegKF, createPersonKF, squareMatrix
 
 print 'start track ros'
 
 g_pub_ppl = None
+g_pub_marker = None
 #<<<<<<< Updated upstream
 #g_use_display = False #True #False
 #g_use_decay_when_nodata =False # True #False #True
@@ -42,13 +46,13 @@ DECAY_RATE = 0.95 #0.93
 DECAY_THRES = 0.3
 DECAY_RATE_LEG = 0.8 #93
 DECAY_THRES_LEG = .5 #0.3
-IMPROVE_RATE = 0.05
+IMPROVE_RATE = 0.05 #0.02 #0.05
 PERSON_CONFIRM_THRES = 0.5
 RMAHALANOBIS = 2. #.5 #2.5 #2.5
-MAX_DIST_PERSON_ONELEG = 1 #.3
+MAX_DIST_PERSON_ONELEG = 1 #.5 #1 #.3
 PERSON_GATING_DISTANCE = 0.8
-MAX_DIST_OWNERSHIP_ONELEG = .5
-LIMIT_PPL_PREDICT = .03
+MAX_DIST_OWNERSHIP_ONELEG = .5 #.35#.5
+LIMIT_PPL_PREDICT = .03 #0.015 #.03
 
 
 def getVMatrixCAModel(k_filter):
@@ -149,7 +153,7 @@ def getMMSEOneLegs(check, onelegs_track, R, KF_point, P):
 	return mmse_x , mmse_y, P_mmse
 
 class PeopleTrackerFromLegs:
-	def __init__(self, display, pub_persons, use_display, use_decay_when_nodata, use_raw_leg_data, no_ppl_predict_when_update_fail,use_limit_ppl_predict ):
+	def __init__(self, display, pub_persons, pub_marker, use_display, use_decay_when_nodata, use_raw_leg_data, no_ppl_predict_when_update_fail,use_limit_ppl_predict ):
 		self.use_display = use_display
 		self.use_decay_when_nodata = use_decay_when_nodata
 		self.no_ppl_predict_when_update_fail = no_ppl_predict_when_update_fail
@@ -168,6 +172,7 @@ class PeopleTrackerFromLegs:
 		self.track_KF_point_leg = []
 		# _frame_idx = 0
 		self._obj_id = 1
+		self.max_obj_id = rospy.get_param('~max_id', 64)
 		self.display = display
 
 		self._first_people = False
@@ -181,7 +186,23 @@ class PeopleTrackerFromLegs:
 		self.track_KF_onelegmode = []
 
 		self.pub_persons = pub_persons
+		self.pub_marker = pub_marker
 
+		# KF Constants
+		self.SAMPLING_RATE = rospy.get_param('~sampling_rate', 40)
+		self.KF_DT = 1/self.SAMPLING_RATE
+		self.KF_DT2 = self.KF_DT*self.KF_DT/2
+
+
+	def generateNewLegId(self):
+		self._obj_id = self._obj_id + 1
+		if self._obj_id > self.max_obj_id: 
+			self._obj_id = 1
+
+	def generateNewPersonId(self):
+		self._people_id = self._people_id+ 1
+		if self._people_id> self.max_obj_id: 
+			self._people_id= 1
 
 	def processMunkresKalman(self,points):
 
@@ -198,11 +219,11 @@ class PeopleTrackerFromLegs:
 				# track_KF_point = []
 				for leg in frame:
 					self.track_KF_leg.append(self._obj_id)
-					self.kalman_filters_leg.append(createLegKF(leg[0], leg[1]))
+					self.kalman_filters_leg.append(createLegKF(leg[0], leg[1], self.KF_DT))
 					self.track_conf_leg.append(leg[2])
 					# self.track_KF_point_leg.append([leg[0],leg[1]])
 					self.track_KF_point_leg.append([leg[0],leg[1],0 ,0])
-					self._obj_id = self._obj_id + 1
+					self.generateNewLegId()
 				# self.display.setup_plot(frame, self.track_KF_point_leg)
 				# tracks.append(track)
 				# tracks_KF.append(track)
@@ -291,11 +312,11 @@ class PeopleTrackerFromLegs:
 						# add new obj id for unassigned measurements
 						# print 'added new object'
 						# track_new.append(_obj_id)
-						kalman_filters_new.append(createLegKF(frame[i][0], frame[i][1]))
+						kalman_filters_new.append(createLegKF(frame[i][0], frame[i][1], self.KF_DT))
 						track_KF_point_new.append([frame[i][0], frame[i][1],0,0])
 						track_KF_new.append(self._obj_id)
 						track_conf_new.append(frame[i][2])
-						self._obj_id = self._obj_id + 1
+						self.generateNewLegId()
 					else:
 						# print i, columns.index(i), rows[columns.index(i)], cost_matrix
 						# if cost_matrix[rows[columns.index(i)]][i] >= COST_MAX_GATING:
@@ -353,6 +374,7 @@ class PeopleTrackerFromLegs:
 			self.findPeopleTracks()
 			self.processMunkresKalmanPeople()
 			self.publishPersons()
+			self.publishTracksMarker()
 			if self.use_display:
 				if not self._first_leg:
 					self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations, self.track_KF_onelegmode)
@@ -536,12 +558,12 @@ class PeopleTrackerFromLegs:
 				for twoleg in twolegs_track:
 					track_KF_onelegmode.append(0)
 					track_KF.append(self._people_id)
-					self.kalman_filters_people.append(createPersonKF(twoleg[6], twoleg[7]))
+					self.kalman_filters_people.append(createPersonKF(twoleg[6], twoleg[7], self.KF_DT, self.KF_DT2))
 					track_conf.append(twoleg[8])
 					track_KF_point.append([twoleg[6], twoleg[7], twoleg[2] , twoleg[3], twoleg[4], twoleg[5]])
 					track_KF_improvements.append(twoleg[8]*IMPROVE_RATE)
 					track_KF_confirmations.append(False)
-					self._people_id = self._people_id + 1
+					self.generateNewPersonId()
 
 			# else:
 			# tracks_KF.append(track_KF)
@@ -624,7 +646,7 @@ class PeopleTrackerFromLegs:
 
 			for i in range(len(twolegs_track)):
 				if i not in columns or cost_matrix[rows[columns.index(i)]][i] >= COST_MAX_GATING:
-					kalman_filters_new.append(createPersonKF(twolegs_track[i][6], twolegs_track[i][7]))
+					kalman_filters_new.append(createPersonKF(twolegs_track[i][6], twolegs_track[i][7], self.KF_DT, self.KF_DT2))
 					# track_KF_point_new.append([twolegs_track[i][6], twolegs_track[i][7]])
 					track_KF_point_new.append([twolegs_track[i][6],twolegs_track[i][7], twolegs_track[i][2] , twolegs_track[i][3], twolegs_track[i][4], twolegs_track[i][5]])
 					track_KF_new.append(self._people_id)
@@ -632,7 +654,7 @@ class PeopleTrackerFromLegs:
 					track_KF_improvements_new.append(twolegs_track[i][8]*IMPROVE_RATE)
 					track_KF_confirmations_new.append(False)
 					track_KF_onelegmode_new.append(0)
-					self._people_id = self._people_id + 1
+					self.generateNewPersonId()
 				else:
 					#print 'updated...'
 					kalman_filters_new.append(self.kalman_filters_people[rows[columns.index(i)]])
@@ -769,6 +791,54 @@ class PeopleTrackerFromLegs:
 
 	# return tracks_KF, _person_id-1, tracks_KF_points, tracks_conf
 
+	def publishTracksMarker(self):
+		onelegs_marker = Marker()
+		twolegs_marker = Marker()
+		onelegs_marker.header.frame_id = "laser"
+		twolegs_marker.header.frame_id = "laser"
+		onelegs_marker.header.stamp = rospy.Time.now()
+		twolegs_marker.header.stamp = rospy.Time.now()
+		onelegs_marker.ns = "debug_onelegs"
+		twolegs_marker.ns = "debug_twolegs"
+		onelegs_marker.id = 10
+		twolegs_marker.id = 11
+		onelegs_marker.pose.orientation.w = 1.0
+		twolegs_marker.pose.orientation.w = 1.0
+		onelegs_marker.scale.x = 0.1
+		twolegs_marker.scale.x = 0.1
+		onelegs_marker.scale.y = 0.1
+		twolegs_marker.scale.y = 0.1
+		onelegs_marker.scale.z = 0.1
+		twolegs_marker.scale.z = 0.1
+		onelegs_marker.color.r = 1
+		onelegs_marker.color.g = 1
+		onelegs_marker.color.b = 1
+		onelegs_marker.color.a = .5
+		twolegs_marker.color.r = 0
+		twolegs_marker.color.g = 0
+		twolegs_marker.color.b = 1
+		twolegs_marker.color.a = .7
+		onelegs_marker.action = Marker.ADD
+		twolegs_marker.action = Marker.ADD
+		onelegs_marker.type = 8#Marker.CUBE
+		twolegs_marker.type = 8#Marker.CUBE
+		for track in self.onelegs_track:
+			point = Point()
+			point.x = track[1]
+			point.y = track[2]
+			point.z = 0
+			onelegs_marker.points.append(point)
+		for track in self.twolegs_track:
+			point = Point()
+			point.x = track[6]
+			point.y = track[7]
+			point.z = 0
+			twolegs_marker.points.append(point)
+		self.pub_marker.publish(onelegs_marker)
+		# print onelegs_marker
+		self.pub_marker.publish(twolegs_marker)
+		# print twolegs_marker
+		
 	def publishPersons(self):
 		persons = PersonTrackArray()
 		persons.header.stamp = rospy.Time.now()
@@ -901,14 +971,15 @@ def processLegArray(msg):
 
 
 def talker():
-	global g_pub_ppl, display_tracker, people_tracker
+	global g_pub_ppl, display_tracker, people_tracker, g_pub_marker
 	rospy.init_node('track_ped', anonymous=False)
 	# rospy.Subscriber('/usb_cam/image_raw', Image, filter_points)
 	rospy.Subscriber('/legs', LegMeasurementArray, processLegArray)
 	g_pub_ppl = rospy.Publisher('/persons', PersonTrackArray, queue_size = 10)
+	g_pub_marker = rospy.Publisher('visualization_marker_debug', Marker, queue_size = 10)
 # <<<<<<< Updated upstream
 	# display_tracker= AnimatedScatter()
-	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail, g_use_limit_ppl_predict )
+	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_pub_marker, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail, g_use_limit_ppl_predict )
 # =======
 	display_tracker= None #AnimatedScatter()
 	# people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail)
