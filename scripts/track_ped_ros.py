@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import rospy
-from mech_input.msg import LegMeasurementArray, LegMeasurement , PersonTrack, PersonTrackArray
+from arcleg_segmentation.msg import LegMeasurementArray, LegMeasurement , PersonTrack, PersonTrackArray
 
 from munkres import Munkres
 from scipy.spatial.distance import mahalanobis
@@ -9,7 +9,7 @@ import math
 import time
 import numpy as np
 import matplotlib
-matplotlib.use('GTKAgg')
+#matplotlib.use('GTKAgg')
 import pylab as plt
 # import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -17,15 +17,20 @@ import matplotlib.animation as animation
 
 from CustomCreateKF import createLegKF, createPersonKF, squareMatrix
 
+print 'start track ros'
+
 g_pub_ppl = None
 #<<<<<<< Updated upstream
-g_use_display = True #True #False
+#g_use_display = False #True #False
 #g_use_decay_when_nodata =False # True #False #True
 g_use_raw_leg_data = False
 g_no_ppl_predict_when_update_fail = False #True
+# <<<<<<< Updated upstream
 g_use_limit_ppl_predict = True
+# =======
+# >>>>>>> Stashed changes
 #=======
-g_use_display = True #True #True #False
+g_use_display = False #True #True #True #False
 g_use_decay_when_nodata = True #False #True
 g_use_raw_leg_data = False
 g_use_clip = False
@@ -33,7 +38,7 @@ g_use_clip = False
 
 COST_MAX_GATING = .8 #1.5 #.7 #1.5 #.7 #1.5
 COST_MAX_GATING_ONELEG = .8 #1.5 #.7 #1.5 #.7 #1.5
-DECAY_RATE = 0.93
+DECAY_RATE = 0.95 #0.93
 DECAY_THRES = 0.3
 DECAY_RATE_LEG = 0.8 #93
 DECAY_THRES_LEG = .5 #0.3
@@ -901,8 +906,13 @@ def talker():
 	# rospy.Subscriber('/usb_cam/image_raw', Image, filter_points)
 	rospy.Subscriber('/legs', LegMeasurementArray, processLegArray)
 	g_pub_ppl = rospy.Publisher('/persons', PersonTrackArray, queue_size = 10)
-	display_tracker= AnimatedScatter()
+# <<<<<<< Updated upstream
+	# display_tracker= AnimatedScatter()
 	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail, g_use_limit_ppl_predict )
+# =======
+	display_tracker= None #AnimatedScatter()
+	# people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail)
+# >>>>>>> Stashed changes
 	rospy.spin()
 	pass
 
