@@ -31,6 +31,7 @@ g_use_raw_leg_data = False
 g_no_ppl_predict_when_update_fail = False #True
 # <<<<<<< Updated upstream
 g_use_limit_ppl_predict = True
+# g_use_limit_ppl_predict = False
 # =======
 # >>>>>>> Stashed changes
 #=======
@@ -790,6 +791,9 @@ class PeopleTrackerFromLegs:
 			# tracks_KF_points.append(track_KF_point)
 
 		# _frame_idx = _frame_idx + 1
+		# print self.track_KF_onelegmode
+		# print self.track_KF_people
+		# print self.track_KF_point_people
 
 	# return tracks_KF, _person_id-1, tracks_KF_points, tracks_conf
 
@@ -857,6 +861,7 @@ class PeopleTrackerFromLegs:
 				persons.Persons.append(person)
 
 				_idx = _idx + 1
+		# print persons
 		self.pub_persons.publish(persons)
 
 def aggreateCoord(data):
@@ -977,9 +982,9 @@ def talker():
 	rospy.init_node('track_ped', anonymous=False)
 	# parameters exposed
 	global COST_MAX_GATING, COST_MAX_GATING_ONELEG, DECAY_RATE, DECAY_THRES, DECAY_RATE_LEG, DECAY_THRES_LEG, IMPROVE_RATE, PERSON_CONFIRM_THRES, RMAHALANOBIS, MAX_DIST_PERSON_ONELEG, PERSON_GATING_DISTANCE, MAX_DIST_OWNERSHIP_ONELEG, LIMIT_PPL_PREDICT, SAMPLING_RATE, MAX_OBJ_ID
-	COST_MAX_GATING = rospy.get_param('~cost_max_gating', .8) #1.5 #.7 #1.5 #.7 #1.5
+	COST_MAX_GATING = rospy.get_param('~cost_max_gating', 1.5) #.8#1.5 #.7 #1.5 #.7 #1.5
 	COST_MAX_GATING_ONELEG = rospy.get_param('~cost_max_gating_oneleg', .8) #1.5 #.7 #1.5 #.7 #1.5
-	DECAY_RATE = rospy.get_param('~decay_rate', 0.95) #0.93
+	DECAY_RATE = rospy.get_param('~decay_rate', 0.97) #0.95#0.93
 	DECAY_THRES = rospy.get_param('~decay_thres', 0.3)
 	DECAY_RATE_LEG = rospy.get_param('~decay_rate_leg', .90) #0.8 #93
 	DECAY_THRES_LEG = rospy.get_param('~decay_thres_leg', .5) #0.3
@@ -989,7 +994,7 @@ def talker():
 	MAX_DIST_PERSON_ONELEG = rospy.get_param('~max_dist_person_oneleg', 1) #.5 #1 #.3
 	PERSON_GATING_DISTANCE = rospy.get_param('~person_gating_distance', 0.8)
 	MAX_DIST_OWNERSHIP_ONELEG = rospy.get_param('~max_dist_ownership_oneleg', .5) #.35#.5
-	LIMIT_PPL_PREDICT = rospy.get_param('~limit_ppl_predict', .03) #0.015 #.03
+	LIMIT_PPL_PREDICT = rospy.get_param('~limit_ppl_predict', .13) #0.015 #.03
 	MAX_OBJ_ID = rospy.get_param('~max_id', 64)
 	SAMPLING_RATE = rospy.get_param('~sampling_rate', 40)
 
