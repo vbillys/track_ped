@@ -60,6 +60,18 @@ PERSON_GATING_DISTANCE = 0.8
 MAX_DIST_OWNERSHIP_ONELEG = .5 #.35#.5
 LIMIT_PPL_PREDICT = .03 #0.015 #.03
 
+PERSON_KF_pd = .5 #25.
+PERSON_KF_pv = .2 #10.
+PERSON_KF_pa = .5 #30.
+PERSON_KF_rd = 0.01
+PERSON_KF_rv = 0.1
+PERSON_KF_ra = 1.
+PERSON_KF_q  = 0.7
+LEG_KF_pd = .5
+LEG_KF_pv = .2
+LEG_KF_rd = 0.05
+LEG_KF_rv = 0.2
+LEG_KF_q  = 0.7
 
 def getVMatrixCAModel(k_filter):
 	V = np.array([[k_filter.P[0,0],k_filter.P[0,3]],[k_filter.P[3,0],k_filter.P[3,3]]])
@@ -211,21 +223,24 @@ class PeopleTrackerFromLegs:
 		if self.init_odom:
 			quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
 			euler = tf.transformations.euler_from_quaternion(quat)
-			last_quat = (self.last_odom_msg.pose.pose.orientation.x, self.last_odom_msg.pose.pose.orientation.y, self.last_odom_msg.pose.pose.orientation.z, self.last_odom_msg.pose.pose.orientation.w)
-			last_euler = tf.transformations.euler_from_quaternion(last_quat)
 			self.heading_rad = euler[2] - self.first_odom_euler[2]
 			self.x_pose = msg.pose.pose.position.x - self.first_odom_msg.pose.pose.position.x
 			self.y_pose = msg.pose.pose.position.y - self.first_odom_msg.pose.pose.position.y
-			self.x_diff = msg.pose.pose.position.x - self.last_odom_msg.pose.pose.position.x
-			self.y_diff = msg.pose.pose.position.y - self.last_odom_msg.pose.pose.position.y
-			self.heading_rad_diff = euler[2] - last_euler[2]
-			print 'x: %.3f y: %.3f @: %.3f\nDiffs:\nx: %.3f y: %.3f @: %.3f' % (self.x_pose, self.y_pose, self.heading_rad, self.x_diff, self.y_diff, self.heading_rad_diff)
+
+			# print 'x: %.3f y: %.3f @: %.3f\nDiffs:\nx: %.3f y: %.3f @: %.3f' % (self.x_pose, self.y_pose, self.heading_rad, self.x_diff, self.y_diff, self.heading_rad_diff)
 		else:
 			self.first_odom_msg = msg
 			self.first_odom_quat = (self.first_odom_msg.pose.pose.orientation.x, self.first_odom_msg.pose.pose.orientation.y, self.first_odom_msg.pose.pose.orientation.z, self.first_odom_msg.pose.pose.orientation.w)
 			self.first_odom_euler = tf.transformations.euler_from_quaternion(self.first_odom_quat)
-		self.last_odom_msg = msg
 		self.init_odom = True
+
+	def calculateOdomDiffAndUpdate(self):
+		self.x_diff = msg.pose.pose.position.x - self.last_odom_msg.pose.pose.position.x
+		self.y_diff = msg.pose.pose.position.y - self.last_odom_msg.pose.pose.position.y
+		last_quat = (self.last_odom_msg.pose.pose.orientation.x, self.last_odom_msg.pose.pose.orientation.y, self.last_odom_msg.pose.pose.orientation.z, self.last_odom_msg.pose.pose.orientation.w)
+		last_euler = tf.transformations.euler_from_quaternion(last_quat)
+		self.heading_rad_diff = euler[2] - last_euler[2]
+		self.last_odom_msg = msg
 
 	def generateNewLegId(self):
 		self._obj_id = self._obj_id + 1
@@ -252,7 +267,7 @@ class PeopleTrackerFromLegs:
 				# track_KF_point = []
 				for leg in frame:
 					self.track_KF_leg.append(self._obj_id)
-					self.kalman_filters_leg.append(createLegKF(leg[0], leg[1], self.KF_DT))
+					self.kalman_filters_leg.append(createLegKF(leg[0], leg[1], self.KF_DT, KF_pd = LEG_KF_pd, KF_pv = LEG_KF_pv, KF_rd = LEG_KF_rd, KF_rv = LEG_KF_rv, KF_q = LEG_KF_q))
 					self.track_conf_leg.append(leg[2])
 					# self.track_KF_point_leg.append([leg[0],leg[1]])
 					self.track_KF_point_leg.append([leg[0],leg[1],0 ,0])
@@ -345,7 +360,7 @@ class PeopleTrackerFromLegs:
 						# add new obj id for unassigned measurements
 						# print 'added new object'
 						# track_new.append(_obj_id)
-						kalman_filters_new.append(createLegKF(frame[i][0], frame[i][1], self.KF_DT))
+						kalman_filters_new.append(createLegKF(frame[i][0], frame[i][1], self.KF_DT, KF_pd = LEG_KF_pd, KF_pv = LEG_KF_pv, KF_rd = LEG_KF_rd, KF_rv = LEG_KF_rv, KF_q = LEG_KF_q))
 						track_KF_point_new.append([frame[i][0], frame[i][1],0,0])
 						track_KF_new.append(self._obj_id)
 						track_conf_new.append(frame[i][2])
@@ -591,7 +606,7 @@ class PeopleTrackerFromLegs:
 				for twoleg in twolegs_track:
 					track_KF_onelegmode.append(0)
 					track_KF.append(self._people_id)
-					self.kalman_filters_people.append(createPersonKF(twoleg[6], twoleg[7], self.KF_DT, self.KF_DT2))
+					self.kalman_filters_people.append(createPersonKF(twoleg[6], twoleg[7], self.KF_DT, self.KF_DT2, KF_pd=PERSON_KF_pd, KF_pv = PERSON_KF_pv, KF_pa = PERSON_KF_pa, KF_rd = PERSON_KF_rd, KF_rv = PERSON_KF_rv, KF_ra = PERSON_KF_ra, KF_q = PERSON_KF_q))
 					track_conf.append(twoleg[8])
 					track_KF_point.append([twoleg[6], twoleg[7], twoleg[2] , twoleg[3], twoleg[4], twoleg[5]])
 					track_KF_improvements.append(twoleg[8]*IMPROVE_RATE)
@@ -625,6 +640,8 @@ class PeopleTrackerFromLegs:
 					if _vector_norm > LIMIT_PPL_PREDICT:
 						_x_updated[0] = _x_bef_updated[0] + (_x_updated[0]-_x_bef_updated[0])*LIMIT_PPL_PREDICT/_vector_norm
 						_x_updated[3] = _x_bef_updated[3] + (_x_updated[3]-_x_bef_updated[3])*LIMIT_PPL_PREDICT/_vector_norm
+						kf.x[0] = _x_updated[0]
+						kf.x[3] = _x_updated[3]
 				track_KF_point_new.append([_x_updated[0], _x_updated[3], self.track_KF_point_people[_kidx][2]
 					,self.track_KF_point_people[_kidx][3]
 					,self.track_KF_point_people[_kidx][4]
@@ -679,7 +696,7 @@ class PeopleTrackerFromLegs:
 
 			for i in range(len(twolegs_track)):
 				if i not in columns or cost_matrix[rows[columns.index(i)]][i] >= COST_MAX_GATING:
-					kalman_filters_new.append(createPersonKF(twolegs_track[i][6], twolegs_track[i][7], self.KF_DT, self.KF_DT2))
+					kalman_filters_new.append(createPersonKF(twolegs_track[i][6], twolegs_track[i][7], self.KF_DT, self.KF_DT2, KF_pd=PERSON_KF_pd, KF_pv = PERSON_KF_pv, KF_pa = PERSON_KF_pa, KF_rd = PERSON_KF_rd, KF_rv = PERSON_KF_rv, KF_ra = PERSON_KF_ra, KF_q = PERSON_KF_q))
 					# track_KF_point_new.append([twolegs_track[i][6], twolegs_track[i][7]])
 					track_KF_point_new.append([twolegs_track[i][6],twolegs_track[i][7], twolegs_track[i][2] , twolegs_track[i][3], twolegs_track[i][4], twolegs_track[i][5]])
 					track_KF_new.append(self._people_id)
@@ -1011,7 +1028,9 @@ def talker():
 
 	rospy.init_node('track_ped', anonymous=False)
 	# parameters exposed
-	global COST_MAX_GATING, COST_MAX_GATING_ONELEG, DECAY_RATE, DECAY_THRES, DECAY_RATE_LEG, DECAY_THRES_LEG, IMPROVE_RATE, PERSON_CONFIRM_THRES, RMAHALANOBIS, MAX_DIST_PERSON_ONELEG, PERSON_GATING_DISTANCE, MAX_DIST_OWNERSHIP_ONELEG, LIMIT_PPL_PREDICT, SAMPLING_RATE, MAX_OBJ_ID, g_use_odom, g_odom_topic
+	global COST_MAX_GATING, COST_MAX_GATING_ONELEG, DECAY_RATE, DECAY_THRES, DECAY_RATE_LEG, DECAY_THRES_LEG, IMPROVE_RATE, PERSON_CONFIRM_THRES, RMAHALANOBIS, MAX_DIST_PERSON_ONELEG, PERSON_GATING_DISTANCE, MAX_DIST_OWNERSHIP_ONELEG, LIMIT_PPL_PREDICT, SAMPLING_RATE, MAX_OBJ_ID, g_use_odom, g_odom_topic, g_use_limit_ppl_predict
+	global PERSON_KF_ra, PERSON_KF_rd, PERSON_KF_rv, PERSON_KF_q, PERSON_KF_pa, PERSON_KF_pd, PERSON_KF_pv
+	global LEG_KF_q, LEG_KF_pd, LEG_KF_pv, LEG_KF_rd, LEG_KF_rv
 	COST_MAX_GATING = rospy.get_param('~cost_max_gating', 1.5) #.8#1.5 #.7 #1.5 #.7 #1.5
 	COST_MAX_GATING_ONELEG = rospy.get_param('~cost_max_gating_oneleg', .8) #1.5 #.7 #1.5 #.7 #1.5
 	DECAY_RATE = rospy.get_param('~decay_rate', 0.97) #0.95#0.93
@@ -1028,12 +1047,33 @@ def talker():
 	MAX_OBJ_ID = rospy.get_param('~max_id', 64)
 	SAMPLING_RATE = rospy.get_param('~sampling_rate', 40)
 
+	person_kf_params = rospy.get_param('~person_kf_params', [.5, .2, .5, .01, .1, 1, .7])
+	leg_kf_params = rospy.get_param('~leg_kf_params', [.5, .2, .05, .2,.7])
+
 	g_use_odom = rospy.get_param('~use_odom', False)
 	g_odom_topic = rospy.get_param('~odom_topic', None)
+	g_use_limit_ppl_predict = rospy.get_param('~use_limit_ppl_predict', True)
 
 	print "sampling_rate: %d max_id: %d"% (SAMPLING_RATE, MAX_OBJ_ID)
 	print "detailed parameters:\n cost_max_gating: %.3f\n cost_max_gating_oneleg: %.3f \n decay_rate: %.3f\n decay_thres: %.3f\n decay_rate_leg: %.3f\n decay_thres_leg: %.3f\n improve_rate: %.3f\n person_confirm_thres: %.3f\n rmahalanobis: %.3f\n max_dist_person_oneleg: %.3f\n person_gating_distance: %.3f\n max_dist_ownership_oneleg: %.3f\n limit_ppl_predict: %.3f" %(COST_MAX_GATING, COST_MAX_GATING_ONELEG, DECAY_RATE, DECAY_THRES, DECAY_RATE_LEG, DECAY_THRES_LEG, IMPROVE_RATE, PERSON_CONFIRM_THRES, RMAHALANOBIS, MAX_DIST_PERSON_ONELEG, PERSON_GATING_DISTANCE, MAX_DIST_OWNERSHIP_ONELEG, LIMIT_PPL_PREDICT)
 	print " use_odom: %s\n odom_topic: %s\n" % (g_use_odom, g_odom_topic)
+	print " use_limit_ppl_predict: %s" % (g_use_limit_ppl_predict)
+	print " person_kf_params: %s" % (person_kf_params)
+	print " leg_kf_params: %s" % (leg_kf_params)
+
+	PERSON_KF_pd = person_kf_params[0]
+	PERSON_KF_pv = person_kf_params[1]
+	PERSON_KF_pa = person_kf_params[2]
+	PERSON_KF_rd = person_kf_params[3]
+	PERSON_KF_rv = person_kf_params[4]
+	PERSON_KF_ra = person_kf_params[5]
+	PERSON_KF_q  = person_kf_params[6]
+
+	LEG_KF_pd = leg_kf_params[0]
+	LEG_KF_pv = leg_kf_params[1]
+	LEG_KF_rd = leg_kf_params[2]
+	LEG_KF_rv = leg_kf_params[3]
+	LEG_KF_q  = leg_kf_params[4]
 
 	global g_pub_ppl, display_tracker, people_tracker, g_pub_marker
 	# rospy.Subscriber('/usb_cam/image_raw', Image, filter_points)

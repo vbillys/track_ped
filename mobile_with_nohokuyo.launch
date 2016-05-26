@@ -1,0 +1,49 @@
+<launch>
+
+
+  <!--node pkg="microstrain_3dmgx2_imu" type="imu_node" name="imu_node" output="screen"-->
+   <!--param name="port" value="ttyUSB0"/--> 
+ <!--/node-->  
+
+ <!--node pkg="tf" type="static_transform_publisher" name="base2laser" args="0.195 0 0.15 0 0 0 base_link laser 100" /-->
+  
+  <node pkg="polar_to_cartesian" type="polar_to_cartesian" name="polar_to_cartesian" output="screen">
+  </node>
+  
+  
+ 
+  <node pkg="tele_joy" type="tele_joy" name="tele_joy" output="screen">
+  </node>
+  
+
+  
+  <node pkg="sliding_autonomy" type="sliding_autonomy" name="sliding_autonomy" output="screen">
+  </node>
+  <node pkg="sliding_autonomy" type="motor_filter" name="motor_filter" output="screen">
+  </node>
+ 
+  
+  <node pkg="arcleg_segmentation" type="arcleg_segmentation" name="arcleg_segmentation" output="screen">
+  </node>
+  <node pkg="track_ped" type="track_ped_ros.py" name="people_leg_tracker" output="screen">
+    <param name="sampling_rate" value="40"/>
+    <param name="max_id" value="32"/>
+    <param name="cost_max_gating" value="1.5"/>
+    <param name="decay_rate" value="0.947"/>
+    <param name="limit_ppl_predict" value="0.13"/>
+    <param name="use_limit_ppl_predict" value="False"/>
+    <param name="rmahalanobis" value="2.0"/>
+    <param name="use_odom" value="True"/>
+    <param name="odom_topic" value="RosAria/pose"/>
+  </node>
+  <node pkg="pursuit" type="pursuit" name="pursuit" output="screen">
+  </node>
+
+  <node pkg="sliding_autonomy" type="status" name="status" output="screen">
+  </node>
+
+
+ 
+</launch>
+
+
