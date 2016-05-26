@@ -17,6 +17,8 @@ import matplotlib.animation as animation
 from visualization_msgs.msg import MarkerArray
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point
+from nav_msgs.msg import Odometry
+import tf
 
 from CustomCreateKF import createLegKF, createPersonKF, squareMatrix
 
@@ -40,6 +42,9 @@ g_use_decay_when_nodata = True #False #True
 g_use_raw_leg_data = False
 g_use_clip = False
 #>>>>>>> Stashed changes
+
+g_use_odom = True
+g_odom_topic = 'RosAria/pose'
 
 COST_MAX_GATING = .8 #1.5 #.7 #1.5 #.7 #1.5
 COST_MAX_GATING_ONELEG = .8 #1.5 #.7 #1.5 #.7 #1.5
@@ -154,7 +159,7 @@ def getMMSEOneLegs(check, onelegs_track, R, KF_point, P):
 	return mmse_x , mmse_y, P_mmse
 
 class PeopleTrackerFromLegs:
-	def __init__(self, display, pub_persons, pub_marker, use_display, use_decay_when_nodata, use_raw_leg_data, no_ppl_predict_when_update_fail,use_limit_ppl_predict ):
+	def __init__(self, display, pub_persons, pub_marker, use_display, use_decay_when_nodata, use_raw_leg_data, no_ppl_predict_when_update_fail,use_limit_ppl_predict , use_odom = False, odom_topic = None):
 		self.use_display = use_display
 		self.use_decay_when_nodata = use_decay_when_nodata
 		self.no_ppl_predict_when_update_fail = no_ppl_predict_when_update_fail
@@ -195,7 +200,32 @@ class PeopleTrackerFromLegs:
 		self.SAMPLING_RATE = SAMPLING_RATE
 		self.KF_DT = 1/self.SAMPLING_RATE
 		self.KF_DT2 = self.KF_DT*self.KF_DT/2
+		self.odom_topic = odom_topic
+		self.use_odom = use_odom
 
+		self.init_odom = False
+		if self.use_odom:
+			rospy.Subscriber(self.odom_topic, Odometry, self.processOdomMsg)
+
+	def processOdomMsg(self, msg):
+		if self.init_odom:
+			quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
+			euler = tf.transformations.euler_from_quaternion(quat)
+			last_quat = (self.last_odom_msg.pose.pose.orientation.x, self.last_odom_msg.pose.pose.orientation.y, self.last_odom_msg.pose.pose.orientation.z, self.last_odom_msg.pose.pose.orientation.w)
+			last_euler = tf.transformations.euler_from_quaternion(last_quat)
+			self.heading_rad = euler[2] - self.first_odom_euler[2]
+			self.x_pose = msg.pose.pose.position.x - self.first_odom_msg.pose.pose.position.x
+			self.y_pose = msg.pose.pose.position.y - self.first_odom_msg.pose.pose.position.y
+			self.x_diff = msg.pose.pose.position.x - self.last_odom_msg.pose.pose.position.x
+			self.y_diff = msg.pose.pose.position.y - self.last_odom_msg.pose.pose.position.y
+			self.heading_rad_diff = euler[2] - last_euler[2]
+			print 'x: %.3f y: %.3f @: %.3f\nDiffs:\nx: %.3f y: %.3f @: %.3f' % (self.x_pose, self.y_pose, self.heading_rad, self.x_diff, self.y_diff, self.heading_rad_diff)
+		else:
+			self.first_odom_msg = msg
+			self.first_odom_quat = (self.first_odom_msg.pose.pose.orientation.x, self.first_odom_msg.pose.pose.orientation.y, self.first_odom_msg.pose.pose.orientation.z, self.first_odom_msg.pose.pose.orientation.w)
+			self.first_odom_euler = tf.transformations.euler_from_quaternion(self.first_odom_quat)
+		self.last_odom_msg = msg
+		self.init_odom = True
 
 	def generateNewLegId(self):
 		self._obj_id = self._obj_id + 1
@@ -981,7 +1011,7 @@ def talker():
 
 	rospy.init_node('track_ped', anonymous=False)
 	# parameters exposed
-	global COST_MAX_GATING, COST_MAX_GATING_ONELEG, DECAY_RATE, DECAY_THRES, DECAY_RATE_LEG, DECAY_THRES_LEG, IMPROVE_RATE, PERSON_CONFIRM_THRES, RMAHALANOBIS, MAX_DIST_PERSON_ONELEG, PERSON_GATING_DISTANCE, MAX_DIST_OWNERSHIP_ONELEG, LIMIT_PPL_PREDICT, SAMPLING_RATE, MAX_OBJ_ID
+	global COST_MAX_GATING, COST_MAX_GATING_ONELEG, DECAY_RATE, DECAY_THRES, DECAY_RATE_LEG, DECAY_THRES_LEG, IMPROVE_RATE, PERSON_CONFIRM_THRES, RMAHALANOBIS, MAX_DIST_PERSON_ONELEG, PERSON_GATING_DISTANCE, MAX_DIST_OWNERSHIP_ONELEG, LIMIT_PPL_PREDICT, SAMPLING_RATE, MAX_OBJ_ID, g_use_odom, g_odom_topic
 	COST_MAX_GATING = rospy.get_param('~cost_max_gating', 1.5) #.8#1.5 #.7 #1.5 #.7 #1.5
 	COST_MAX_GATING_ONELEG = rospy.get_param('~cost_max_gating_oneleg', .8) #1.5 #.7 #1.5 #.7 #1.5
 	DECAY_RATE = rospy.get_param('~decay_rate', 0.97) #0.95#0.93
@@ -998,8 +1028,12 @@ def talker():
 	MAX_OBJ_ID = rospy.get_param('~max_id', 64)
 	SAMPLING_RATE = rospy.get_param('~sampling_rate', 40)
 
+	g_use_odom = rospy.get_param('~use_odom', False)
+	g_odom_topic = rospy.get_param('~odom_topic', None)
+
 	print "sampling_rate: %d max_id: %d"% (SAMPLING_RATE, MAX_OBJ_ID)
 	print "detailed parameters:\n cost_max_gating: %.3f\n cost_max_gating_oneleg: %.3f \n decay_rate: %.3f\n decay_thres: %.3f\n decay_rate_leg: %.3f\n decay_thres_leg: %.3f\n improve_rate: %.3f\n person_confirm_thres: %.3f\n rmahalanobis: %.3f\n max_dist_person_oneleg: %.3f\n person_gating_distance: %.3f\n max_dist_ownership_oneleg: %.3f\n limit_ppl_predict: %.3f" %(COST_MAX_GATING, COST_MAX_GATING_ONELEG, DECAY_RATE, DECAY_THRES, DECAY_RATE_LEG, DECAY_THRES_LEG, IMPROVE_RATE, PERSON_CONFIRM_THRES, RMAHALANOBIS, MAX_DIST_PERSON_ONELEG, PERSON_GATING_DISTANCE, MAX_DIST_OWNERSHIP_ONELEG, LIMIT_PPL_PREDICT)
+	print " use_odom: %s\n odom_topic: %s\n" % (g_use_odom, g_odom_topic)
 
 	global g_pub_ppl, display_tracker, people_tracker, g_pub_marker
 	# rospy.Subscriber('/usb_cam/image_raw', Image, filter_points)
@@ -1008,7 +1042,7 @@ def talker():
 	g_pub_marker = rospy.Publisher('visualization_marker_debug', Marker, queue_size = 10)
 # <<<<<<< Updated upstream
 	# display_tracker= AnimatedScatter()
-	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_pub_marker, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail, g_use_limit_ppl_predict )
+	people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_pub_marker, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail, g_use_limit_ppl_predict , use_odom = g_use_odom, odom_topic = g_odom_topic)
 # =======
 	display_tracker= None #AnimatedScatter()
 	# people_tracker = PeopleTrackerFromLegs(display_tracker, g_pub_ppl, g_use_display, g_use_decay_when_nodata, g_use_raw_leg_data, g_no_ppl_predict_when_update_fail)
