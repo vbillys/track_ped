@@ -28,7 +28,7 @@
   <node pkg="track_ped" type="track_ped_ros.py" name="people_leg_tracker" output="screen">
     <param name="sampling_rate" value="40"/>
     <param name="max_id" value="32"/>
-    <param name="cost_max_gating" value="1.5"/>
+    <param name="cost_max_gating" value="2.5"/>
     <param name="decay_rate" value="0.947"/>
     <param name="limit_ppl_predict" value="0.13"/>
     <param name="use_limit_ppl_predict" value="False"/>

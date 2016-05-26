@@ -216,6 +216,16 @@ class PeopleTrackerFromLegs:
 		self.use_odom = use_odom
 
 		self.init_odom = False
+		self.first_odom_calculated = False
+		self.x_pose_last = 0
+		self.y_pose_last = 0
+		self.heading_pose_last = 0
+		self.x_pose= 0
+		self.y_pose= 0
+		self.heading_rad = 0
+		self.x_diff = 0
+		self.y_diff = 0
+		self.heading_rad_diff = 0
 		if self.use_odom:
 			rospy.Subscriber(self.odom_topic, Odometry, self.processOdomMsg)
 
@@ -228,6 +238,7 @@ class PeopleTrackerFromLegs:
 			self.y_pose = msg.pose.pose.position.y - self.first_odom_msg.pose.pose.position.y
 
 			# print 'x: %.3f y: %.3f @: %.3f\nDiffs:\nx: %.3f y: %.3f @: %.3f' % (self.x_pose, self.y_pose, self.heading_rad, self.x_diff, self.y_diff, self.heading_rad_diff)
+			self.first_odom_calculated = True
 		else:
 			self.first_odom_msg = msg
 			self.first_odom_quat = (self.first_odom_msg.pose.pose.orientation.x, self.first_odom_msg.pose.pose.orientation.y, self.first_odom_msg.pose.pose.orientation.z, self.first_odom_msg.pose.pose.orientation.w)
@@ -235,12 +246,23 @@ class PeopleTrackerFromLegs:
 		self.init_odom = True
 
 	def calculateOdomDiffAndUpdate(self):
-		self.x_diff = msg.pose.pose.position.x - self.last_odom_msg.pose.pose.position.x
-		self.y_diff = msg.pose.pose.position.y - self.last_odom_msg.pose.pose.position.y
-		last_quat = (self.last_odom_msg.pose.pose.orientation.x, self.last_odom_msg.pose.pose.orientation.y, self.last_odom_msg.pose.pose.orientation.z, self.last_odom_msg.pose.pose.orientation.w)
-		last_euler = tf.transformations.euler_from_quaternion(last_quat)
-		self.heading_rad_diff = euler[2] - last_euler[2]
-		self.last_odom_msg = msg
+		if not self.first_odom_calculated:
+			return
+		if not self.use_odom:
+			return
+		# self.x_diff = msg.pose.pose.position.x - self.last_odom_msg.pose.pose.position.x
+		# self.y_diff = msg.pose.pose.position.y - self.last_odom_msg.pose.pose.position.y
+		self.x_diff = self.x_pose - self.x_pose_last
+		self.y_diff = self.y_pose - self.y_pose_last
+		# last_quat = (self.last_odom_msg.pose.pose.orientation.x, self.last_odom_msg.pose.pose.orientation.y, self.last_odom_msg.pose.pose.orientation.z, self.last_odom_msg.pose.pose.orientation.w)
+		# last_euler = tf.transformations.euler_from_quaternion(last_quat)
+		# self.heading_rad_diff = euler[2] - last_euler[2]
+		self.heading_rad_diff = self.heading_rad - self.heading_pose_last
+		# self.last_odom_msg = msg
+		self.x_pose_last = self.x_pose
+		self.y_pose_last = self.y_pose
+		self.heading_pose_last = self.heading_rad
+		# print "pose diffs: %.3f, %.3f, %.3f" % (self.x_diff, self.y_diff, self.heading_rad_diff)
 
 	def generateNewLegId(self):
 		self._obj_id = self._obj_id + 1
@@ -252,8 +274,54 @@ class PeopleTrackerFromLegs:
 		if self._people_id> self.max_obj_id: 
 			self._people_id= 1
 
+	def odomTranslateAndThenRotate(self, coord_2d):
+		coord_2d[0] = coord_2d[0] - self.x_pose
+		coord_2d[1] = coord_2d[1] - self.y_pose
+		coord_2d_new_x = math.cos(-self.heading_rad)*coord_2d[0] - math.sin(-self.heading_rad)*coord_2d[1]
+		coord_2d_new_y = math.sin(-self.heading_rad)*coord_2d[0] + math.cos(-self.heading_rad)*coord_2d[1]
+		return [coord_2d_new_x, coord_2d_new_y]
+
+	def odomTranslateAndThenRotate2(self, coord_2d):
+		coord_2d_new_x = math.cos(self.heading_rad)*coord_2d[0] - math.sin(self.heading_rad)*coord_2d[1]
+		coord_2d_new_y = math.sin(self.heading_rad)*coord_2d[0] + math.cos(self.heading_rad)*coord_2d[1]
+		coord_2d_new_x  = coord_2d_new_x + self.x_pose
+		coord_2d_new_y  = coord_2d_new_y + self.y_pose
+		return [coord_2d_new_x, coord_2d_new_y]
+
+	def shiftMeasurementAccordingOdomDiff(self, points):
+		points_new = []
+		for leg in points:
+			leg_new = leg
+			_xd = [leg[0], leg[1]]
+			_xd = self.odomTranslateAndThenRotate2(_xd)
+			leg_new[0] = _xd[0]
+			leg_new[1] = _xd[1]
+			points_new.append(leg_new)
+		return points_new
+
+	def shiftTrackAccordingOdomDiff(self, points):
+		for kf in self.kalman_filters_leg:
+			_x = kf.x
+			_xd = [_x[0], _x[2]]
+			_xd = self.odomTranslateAndThenRotate(_xd)
+			_xv = [_x[1], _x[3]]
+			_xv = self.odomTranslateAndThenRotate(_xv)
+			kf.x = [_xd[0], _xv[0], _xd[1], _xv[1]]
+		for kf in self.kalman_filters_people:
+			_x = kf.x
+			_xd = [_x[0], _x[3]]
+			_xd = self.odomTranslateAndThenRotate(_xd)
+			_xv = [_x[1], _x[4]]
+			_xv = self.odomTranslateAndThenRotate(_xv)
+			_xa = [_x[2], _x[5]]
+			_xa = self.odomTranslateAndThenRotate(_xa)
+			kf.x = [_xd[0], _xv[0], _xa[0], _xd[1], _xv[1], _xa[1]]
+
 	def processMunkresKalman(self,points):
 
+		self.calculateOdomDiffAndUpdate()
+		# self.shiftTrackAccordingOdomDiff(points)
+		points = self.shiftMeasurementAccordingOdomDiff(points)
 		# for frame in points:
 		frame = points
 		self.points = points
@@ -456,6 +524,7 @@ class PeopleTrackerFromLegs:
 				self.findPeopleTracks()
 				self.processMunkresKalmanPeople()
 				self.publishPersons()
+				self.publishTracksMarker()
 				if self.use_display:
 					if not self._first_leg:
 						self.display.setup_plot(frame, self.track_KF_point_leg, self.track_KF_point_people, self.track_KF_people, self.track_KF_confirmations, self.track_KF_onelegmode)
@@ -879,12 +948,20 @@ class PeopleTrackerFromLegs:
 			point = Point()
 			point.x = track[1]
 			point.y = track[2]
+			_xd = [point.x , point.y]
+			_xd = self.odomTranslateAndThenRotate(_xd)
+			point.x = _xd[0]
+			point.y = _xd[1]
 			point.z = 0
 			onelegs_marker.points.append(point)
 		for track in self.twolegs_track:
 			point = Point()
 			point.x = track[6]
 			point.y = track[7]
+			_xd = [point.x , point.y]
+			_xd = self.odomTranslateAndThenRotate(_xd)
+			point.x = _xd[0]
+			point.y = _xd[1]
 			point.z = 0
 			twolegs_marker.points.append(point)
 		self.pub_marker.publish(onelegs_marker)
@@ -904,6 +981,10 @@ class PeopleTrackerFromLegs:
 				person.ConPerson = conf
 				person.xPerson = self.track_KF_point_people[_idx][0]
 				person.yPerson = self.track_KF_point_people[_idx][1]
+				_xd = [person.xPerson , person.yPerson]
+				_xd = self.odomTranslateAndThenRotate(_xd)
+				person.xPerson = _xd[0]
+				person.yPerson = _xd[1]
 				person.object_id = self.track_KF_people[_idx]
 				persons.Persons.append(person)
 
