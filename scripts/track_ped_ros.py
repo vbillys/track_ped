@@ -170,6 +170,13 @@ def getMMSEOneLegs(check, onelegs_track, R, KF_point, P):
 
 	return mmse_x , mmse_y, P_mmse
 
+
+def rotateYaw( coord_2d, yaw):
+	coord_2d_new_x = math.cos(yaw)*coord_2d[0] - math.sin(yaw)*coord_2d[1]
+	coord_2d_new_y = math.sin(yaw)*coord_2d[0] + math.cos(yaw)*coord_2d[1]
+	return [coord_2d_new_x, coord_2d_new_y]
+
+
 class PeopleTrackerFromLegs:
 	def __init__(self, display, pub_persons, pub_marker, use_display, use_decay_when_nodata, use_raw_leg_data, no_ppl_predict_when_update_fail,use_limit_ppl_predict , use_odom = False, odom_topic = None):
 		self.use_display = use_display
@@ -226,8 +233,8 @@ class PeopleTrackerFromLegs:
 		self.x_diff = 0
 		self.y_diff = 0
 		self.heading_rad_diff = 0
-		if self.use_odom:
-			rospy.Subscriber(self.odom_topic, Odometry, self.processOdomMsg)
+		#if self.use_odom:
+		rospy.Subscriber(self.odom_topic, Odometry, self.processOdomMsg)
 
 	def processOdomMsg(self, msg):
 		if self.init_odom:
@@ -239,10 +246,12 @@ class PeopleTrackerFromLegs:
 
 			# print 'x: %.3f y: %.3f @: %.3f\nDiffs:\nx: %.3f y: %.3f @: %.3f' % (self.x_pose, self.y_pose, self.heading_rad, self.x_diff, self.y_diff, self.heading_rad_diff)
 			self.first_odom_calculated = True
+			self.shiftTrackIfYawRateAboveThreshold( msg.twist.twist.angular.z)
 		else:
 			self.first_odom_msg = msg
 			self.first_odom_quat = (self.first_odom_msg.pose.pose.orientation.x, self.first_odom_msg.pose.pose.orientation.y, self.first_odom_msg.pose.pose.orientation.z, self.first_odom_msg.pose.pose.orientation.w)
 			self.first_odom_euler = tf.transformations.euler_from_quaternion(self.first_odom_quat)
+			#self.calculateOdomDiffAndUpdate()
 		self.init_odom = True
 
 	def calculateOdomDiffAndUpdate(self):
@@ -264,6 +273,10 @@ class PeopleTrackerFromLegs:
 		self.heading_pose_last = self.heading_rad
 		# print "pose diffs: %.3f, %.3f, %.3f" % (self.x_diff, self.y_diff, self.heading_rad_diff)
 
+	def shiftTrackIfYawRateAboveThreshold(self, twistz):
+		# if twistz > math.radians(.3*10): # sampling rate of odometry
+		self.rotateTrackWithYaw(-twistz/10)
+
 	def generateNewLegId(self):
 		self._obj_id = self._obj_id + 1
 		if self._obj_id > self.max_obj_id: 
@@ -273,6 +286,7 @@ class PeopleTrackerFromLegs:
 		self._people_id = self._people_id+ 1
 		if self._people_id> self.max_obj_id: 
 			self._people_id= 1
+
 
 	def odomTranslateAndThenRotate(self, coord_2d):
 		coord_2d[0] = coord_2d[0] - self.x_pose
@@ -299,7 +313,25 @@ class PeopleTrackerFromLegs:
 			points_new.append(leg_new)
 		return points_new
 
-	def shiftTrackAccordingOdomDiff(self, points):
+	def rotateTrackWithYaw(self, yaw):
+		for kf in self.kalman_filters_leg:
+			_x = kf.x
+			_xd = [_x[0], _x[2]]
+			_xd = rotateYaw(_xd, yaw)
+			_xv = [_x[1], _x[3]]
+			_xv = rotateYaw(_xv, yaw)
+			kf.x = [_xd[0], _xv[0], _xd[1], _xv[1]]
+		for kf in self.kalman_filters_people:
+			_x = kf.x
+			_xd = [_x[0], _x[3]]
+			_xd = rotateYaw(_xd, yaw)
+			_xv = [_x[1], _x[4]]
+			_xv = rotateYaw(_xv, yaw)
+			_xa = [_x[2], _x[5]]
+			_xa = rotateYaw(_xa, yaw)
+			kf.x = [_xd[0], _xv[0], _xa[0], _xd[1], _xv[1], _xa[1]]
+
+	def shiftTrackAccordingOdomDiff(self):
 		for kf in self.kalman_filters_leg:
 			_x = kf.x
 			_xd = [_x[0], _x[2]]
@@ -319,9 +351,10 @@ class PeopleTrackerFromLegs:
 
 	def processMunkresKalman(self,points):
 
-		self.calculateOdomDiffAndUpdate()
+		# self.calculateOdomDiffAndUpdate()
 		# self.shiftTrackAccordingOdomDiff(points)
-		points = self.shiftMeasurementAccordingOdomDiff(points)
+		if self.use_odom:
+			points = self.shiftMeasurementAccordingOdomDiff(points)
 		# for frame in points:
 		frame = points
 		self.points = points
@@ -950,20 +983,22 @@ class PeopleTrackerFromLegs:
 			point = Point()
 			point.x = track[1]
 			point.y = track[2]
-			_xd = [point.x , point.y]
-			_xd = self.odomTranslateAndThenRotate(_xd)
-			point.x = _xd[0]
-			point.y = _xd[1]
+			if self.use_odom:
+				_xd = [point.x , point.y]
+				_xd = self.odomTranslateAndThenRotate(_xd)
+				point.x = _xd[0]
+				point.y = _xd[1]
 			point.z = 0
 			onelegs_marker.points.append(point)
 		for track in self.twolegs_track:
 			point = Point()
 			point.x = track[6]
 			point.y = track[7]
-			_xd = [point.x , point.y]
-			_xd = self.odomTranslateAndThenRotate(_xd)
-			point.x = _xd[0]
-			point.y = _xd[1]
+			if self.use_odom:
+				_xd = [point.x , point.y]
+				_xd = self.odomTranslateAndThenRotate(_xd)
+				point.x = _xd[0]
+				point.y = _xd[1]
 			point.z = 0
 			twolegs_marker.points.append(point)
 		self.pub_marker.publish(onelegs_marker)
@@ -983,10 +1018,11 @@ class PeopleTrackerFromLegs:
 				person.ConPerson = conf
 				person.xPerson = self.track_KF_point_people[_idx][0]
 				person.yPerson = self.track_KF_point_people[_idx][1]
-				_xd = [person.xPerson , person.yPerson]
-				_xd = self.odomTranslateAndThenRotate(_xd)
-				person.xPerson = _xd[0]
-				person.yPerson = _xd[1]
+				if self.use_odom:
+					_xd = [person.xPerson , person.yPerson]
+					_xd = self.odomTranslateAndThenRotate(_xd)
+					person.xPerson = _xd[0]
+					person.yPerson = _xd[1]
 				person.object_id = self.track_KF_people[_idx]
 				persons.Persons.append(person)
 
