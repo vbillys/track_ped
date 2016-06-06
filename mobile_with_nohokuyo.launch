@@ -1,5 +1,7 @@
 <launch>
 
+  <node pkg="tf" type="static_transform_publisher" name="base_link_to_laser" 
+args="0.0 0.0 0.0 0.0 0.0 0.0 /base_laser_link /laser 10" />
 
   <!--node pkg="microstrain_3dmgx2_imu" type="imu_node" name="imu_node" output="screen"-->
    <!--param name="port" value="ttyUSB0"/--> 
@@ -28,18 +30,13 @@
   <node pkg="track_ped" type="track_ped_ros.py" name="people_leg_tracker" output="screen">
     <param name="sampling_rate" value="40"/>
     <param name="max_id" value="32"/>
-    <param name="cost_max_gating" value="2.5"/>
-    <param name="cost_max_gating_oneleg" value="0.8"/>
-    <param name="max_dist_person_oneleg" value="1.0"/>
-    <param name="person_gating_distance" value="0.5"/>
-    <param name="decay_rate" value="0.9447"/>
-    <param name="decay_thres" value="0.35"/>
-    <param name="improve_rate" value="0.02"/>
-    <param name="person_confirm_thres" value="0.72"/>
+    <param name="cost_max_gating" value="0.8"/>
+    <param name="person_gating_distance" value="0.4"/>
+    <param name="decay_rate" value="0.97"/>
     <param name="limit_ppl_predict" value="0.13"/>
     <param name="use_limit_ppl_predict" value="False"/>
     <param name="rmahalanobis" value="2.0"/>
-    <param name="use_odom" value="True"/>
+    <param name="use_odom" value="False"/>
     <param name="odom_topic" value="RosAria/pose"/>
   </node>
   <node pkg="pursuit" type="pursuit" name="pursuit" output="screen">
