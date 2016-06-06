@@ -29,7 +29,13 @@
     <param name="sampling_rate" value="40"/>
     <param name="max_id" value="32"/>
     <param name="cost_max_gating" value="2.5"/>
-    <param name="decay_rate" value="0.947"/>
+    <param name="cost_max_gating_oneleg" value="0.8"/>
+    <param name="max_dist_person_oneleg" value="1.0"/>
+    <param name="person_gating_distance" value="0.5"/>
+    <param name="decay_rate" value="0.9447"/>
+    <param name="decay_thres" value="0.35"/>
+    <param name="improve_rate" value="0.02"/>
+    <param name="person_confirm_thres" value="0.72"/>
     <param name="limit_ppl_predict" value="0.13"/>
     <param name="use_limit_ppl_predict" value="False"/>
     <param name="rmahalanobis" value="2.0"/>
