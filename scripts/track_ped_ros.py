@@ -700,9 +700,11 @@ class PeopleTrackerFromLegs:
 				_x_bef_updated = kf.x
 				if self.no_ppl_predict_when_update_fail:
 					if self.track_KF_onelegmode[_kidx] < 2:
-						kf.predict()
+						if self.track_KF_confirmations[_kidx]:
+							kf.predict()
 				else:
-					kf.predict()
+					if self.track_KF_confirmations[_kidx]:
+						kf.predict()
 				_x_updated = kf.x
 				if self.use_limit_ppl_predict:
 					_vector_norm = math.hypot(_x_updated[0]-_x_bef_updated[0], _x_updated[3]-_x_bef_updated[3])
