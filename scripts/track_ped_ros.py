@@ -195,6 +195,7 @@ class PeopleTrackerFromLegs:
 		self.track_KF_leg = []
 		self.track_conf_leg = []
 		self.track_KF_point_leg = []
+		self.track_size_leg = []
 		# _frame_idx = 0
 		self._obj_id = 1
 		# self.max_obj_id = rospy.get_param('~max_id', 64)
@@ -370,6 +371,7 @@ class PeopleTrackerFromLegs:
 					self.track_KF_leg.append(self._obj_id)
 					self.kalman_filters_leg.append(createLegKF(leg[0], leg[1], self.KF_DT, KF_pd = LEG_KF_pd, KF_pv = LEG_KF_pv, KF_rd = LEG_KF_rd, KF_rv = LEG_KF_rv, KF_q = LEG_KF_q))
 					self.track_conf_leg.append(leg[2])
+					self.track_size_leg.append(leg[3])
 					# self.track_KF_point_leg.append([leg[0],leg[1]])
 					self.track_KF_point_leg.append([leg[0],leg[1],0 ,0])
 					self.generateNewLegId()
@@ -431,6 +433,7 @@ class PeopleTrackerFromLegs:
 				# track_new = []
 				track_KF_new = []
 				track_conf_new = []
+				track_size_new = []
 				track_KF_point_new = []
 				kalman_filters_new = []
 				rows = []
@@ -465,6 +468,7 @@ class PeopleTrackerFromLegs:
 						track_KF_point_new.append([frame[i][0], frame[i][1],0,0])
 						track_KF_new.append(self._obj_id)
 						track_conf_new.append(frame[i][2])
+						track_size_new.append(frame[i][3])
 						self.generateNewLegId()
 					else:
 						# print i, columns.index(i), rows[columns.index(i)], cost_matrix
@@ -485,6 +489,7 @@ class PeopleTrackerFromLegs:
 
 						track_KF_new.append(self.track_KF_leg[rows[columns.index(i)]])
 						track_conf_new.append(self.track_conf_leg[rows[columns.index(i)]]*DECAY_RATE_LEG + frame[i][2]*(1-DECAY_RATE_LEG))
+						track_size_new.append(self.track_size_leg[rows[columns.index(i)]])
 
 				# # Maintain unassinged KF tracks
 				# if len(rows) < len(track_KF):
@@ -498,6 +503,7 @@ class PeopleTrackerFromLegs:
 							# print 'maintaining', kf_obji
 							kalman_filters_new.append(self.kalman_filters_leg[_index])
 							track_conf_new.append(_conf)
+							track_size_new.append(self.track_size_leg[_index])
 							# track_KF_point_new.append([track_KF_point[_index][0],track_KF_point[_index][1]])
 							track_KF_point_new.append([self.track_KF_point_leg[_index][0],self.track_KF_point_leg[_index][1], self.track_KF_point_leg[_index][2] ,self.track_KF_point_leg[_index][3]])
 							# track_new.append(kf_obji)
@@ -508,6 +514,7 @@ class PeopleTrackerFromLegs:
 				self.track_KF_leg = track_KF_new
 				# track = track_new
 				self.track_conf_leg = track_conf_new
+				self.track_size_leg = track_size_new
 				self.track_KF_point_leg = track_KF_point_new
 
 				# print track, track_conf
@@ -586,6 +593,7 @@ class PeopleTrackerFromLegs:
 		else:
 			track = self.track_KF_point_leg
 			conf  = self.track_conf_leg
+			size  = self.track_size_leg
 		# for track, conf in zip (leg_tracks, leg_confs):
 		if len(track) > 1:
 			leg_dists = []
@@ -638,26 +646,27 @@ class PeopleTrackerFromLegs:
 						_x_index2= track[t_index2][0]
 						_y_index2= track[t_index2][1]
 						_conf = ( conf[t_index] + conf[t_index2] ) /2
-						twolegs_track.append([t_index2,t_index , _x_index, _y_index, _x_index2, _y_index2, (_x_index + _x_index2)/2, (_y_index + _y_index2)/2, _conf])
+						_size = ( size[t_index] + size[t_index2] ) /2
+						twolegs_track.append([t_index2,t_index , _x_index, _y_index, _x_index2, _y_index2, (_x_index + _x_index2)/2, (_y_index + _y_index2)/2, _conf, _size])
 						uniqueness[t_index] = None
 						uniqueness[t_index2] = None
 					else:
 						uniqueness[t_index] = None
-						onelegs_track.append([t_index, track[t_index][0], track[t_index][1], conf[t_index]])
+						onelegs_track.append([t_index, track[t_index][0], track[t_index][1], conf[t_index], size[t_index]])
 						# removing already added (conflicting found later)
 						tt_idx = 0
 						for _twoleg in twolegs_track:
 							# if _twoleg[0] == t_index or _twoleg[0] == t_index2 or _twoleg[1] == t_index or _twoleg[1] == t_index2:
 							if _twoleg[0] == t_index:
 								twolegs_track.pop(twolegs_track.index(_twoleg))
-								onelegs_track.append([_twoleg[1], track[_twoleg[1]][0], track[_twoleg[1]][1], conf[_twoleg[1]]])
+								onelegs_track.append([_twoleg[1], track[_twoleg[1]][0], track[_twoleg[1]][1], conf[_twoleg[1]], size[_twoleg[1]]])
 							if _twoleg[1] == t_index:
 								twolegs_track.pop(twolegs_track.index(_twoleg))
-								onelegs_track.append([_twoleg[0], track[_twoleg[0]][0], track[_twoleg[0]][1], conf[_twoleg[0]]])
+								onelegs_track.append([_twoleg[0], track[_twoleg[0]][0], track[_twoleg[0]][1], conf[_twoleg[0]], size[_twoleg[1]]])
 							tt_idx = tt_idx + 1
 				else:
 					if uni is not None:
-						onelegs_track.append([t_index, track[t_index][0], track[t_index][1], conf[t_index]])
+						onelegs_track.append([t_index, track[t_index][0], track[t_index][1], conf[t_index], size[t_index]])
 				t_index = t_index + 1
 			# print uniqueness
 			# print onelegs_track
@@ -675,7 +684,7 @@ class PeopleTrackerFromLegs:
 			self.twolegs_track = []
 			# onelegs_tracks.append([[0, track[0][0], track[0][1]]])
 			try:
-				self.onelegs_track = [[0, track[0][0], track[0][1], conf[0]]]
+				self.onelegs_track = [[0, track[0][0], track[0][1], conf[0], size[0]]]
 			except:
 				self.onelegs_track = []
 		# if self.use_display:
@@ -698,6 +707,7 @@ class PeopleTrackerFromLegs:
 			# _first = True
 			track_KF = []
 			track_conf = []
+			track_size = []
 			track_KF_point = []
 			track_KF_confirmations = []
 			track_KF_improvements = []
@@ -710,6 +720,7 @@ class PeopleTrackerFromLegs:
 					track_KF.append(self._people_id)
 					self.kalman_filters_people.append(createPersonKF(twoleg[6], twoleg[7], self.KF_DT, self.KF_DT2, KF_pd=PERSON_KF_pd, KF_pv = PERSON_KF_pv, KF_pa = PERSON_KF_pa, KF_rd = PERSON_KF_rd, KF_rv = PERSON_KF_rv, KF_ra = PERSON_KF_ra, KF_q = PERSON_KF_q))
 					track_conf.append(twoleg[8])
+					track_size.append(twoleg[9])
 					track_KF_point.append([twoleg[6], twoleg[7], twoleg[2] , twoleg[3], twoleg[4], twoleg[5]])
 					track_KF_improvements.append(twoleg[8]*IMPROVE_RATE)
 					track_KF_confirmations.append(False)
@@ -721,6 +732,7 @@ class PeopleTrackerFromLegs:
 			# tracks_KF_points.append(track_KF_point)
 			self.track_KF_people = track_KF
 			self.track_conf_people = track_conf
+			self.track_size_people = track_size
 			self.track_KF_point_people = track_KF_point
 			self.track_KF_improvements = track_KF_improvements
 			self.track_KF_confirmations = track_KF_confirmations
@@ -782,6 +794,7 @@ class PeopleTrackerFromLegs:
 
 			track_KF_new = []
 			track_conf_new = []
+			track_size_new = []
 			track_KF_point_new = []
 			kalman_filters_new = []
 			track_KF_confirmations_new = []
@@ -805,6 +818,7 @@ class PeopleTrackerFromLegs:
 					track_KF_point_new.append([twolegs_track[i][6],twolegs_track[i][7], twolegs_track[i][2] , twolegs_track[i][3], twolegs_track[i][4], twolegs_track[i][5]])
 					track_KF_new.append(self._people_id)
 					track_conf_new.append(twolegs_track[i][8])
+					track_size_new.append(twolegs_track[i][9])
 					track_KF_improvements_new.append(twolegs_track[i][8]*IMPROVE_RATE)
 					track_KF_confirmations_new.append(False)
 					track_KF_onelegmode_new.append(0)
@@ -823,6 +837,7 @@ class PeopleTrackerFromLegs:
 
 					track_KF_new.append(self.track_KF_people[rows[columns.index(i)]])
 					track_conf_new.append(self.track_conf_people[rows[columns.index(i)]]*DECAY_RATE + twolegs_track[i][8]*(1-DECAY_RATE))
+					track_size_new.append(self.track_size_people[rows[columns.index(i)]])
 					_improve = self.track_KF_improvements[rows[columns.index(i)]] + twolegs_track[i][8]*IMPROVE_RATE
 					track_KF_improvements_new.append(_improve)
 					track_KF_onelegmode_new.append(0)
@@ -867,6 +882,7 @@ class PeopleTrackerFromLegs:
 						if _check[0]:
 							_gated_sum_conf = sum([onelegs_track[s][3] for s in _check[0]])
 							_conf = self.track_conf_people[_index]*DECAY_RATE + (_gated_sum_conf/_gated_len)*(1-DECAY_RATE)
+							_size = self.track_size_people[_index]
 							if _conf > DECAY_THRES:
 								# if kf_obji == 1:
 									# print 'object 1 found at least 1 onelegs averaging and go...'
@@ -878,6 +894,7 @@ class PeopleTrackerFromLegs:
 								self.kalman_filters_people[_index].R = _R
 								kalman_filters_new.append(self.kalman_filters_people[_index])
 								track_conf_new.append(_conf)
+								track_size_new.append(_size)
 								_x_updated = self.kalman_filters_people[_index].x
 								track_KF_point_new.append([_x_updated[0],_x_updated[3]
 								# track_KF_point_new.append([self.track_KF_point_people[_index][0],self.track_KF_point_people[_index][1]
@@ -895,6 +912,7 @@ class PeopleTrackerFromLegs:
 							# self.kalman_filters_people[_index].update([self.track_KF_point_people[_index][0],self.track_KF_point_people[_index][1]])
 							kalman_filters_new.append(self.kalman_filters_people[_index])
 							track_conf_new.append(self.track_conf_people[_index])
+							track_size_new.append(self.track_size_people[_index])
 							track_KF_point_new.append([self.track_KF_point_people[_index][0],self.track_KF_point_people[_index][1]
 								,self.track_KF_point_people[_index][2]
 								,self.track_KF_point_people[_index][3]
@@ -911,9 +929,11 @@ class PeopleTrackerFromLegs:
 
 					else:
 						_conf = self.track_conf_people[_index]*DECAY_RATE
+						_size = self.track_size_people[_index]
 						if _conf > DECAY_THRES:
 							kalman_filters_new.append(self.kalman_filters_people[_index])
 							track_conf_new.append(_conf)
+							track_size_new.append(_size)
 							track_KF_point_new.append([self.track_KF_point_people[_index][0],self.track_KF_point_people[_index][1]
 								,self.track_KF_point_people[_index][2]
 								,self.track_KF_point_people[_index][3]
@@ -932,6 +952,7 @@ class PeopleTrackerFromLegs:
 			self.kalman_filters_people= kalman_filters_new
 			self.track_KF_people= track_KF_new
 			self.track_conf_people= track_conf_new
+			self.track_size_people= track_size_new
 			self.track_KF_point_people= track_KF_point_new
 			self.track_KF_improvements = track_KF_improvements_new
 			self.track_KF_confirmations = track_KF_confirmations_new
@@ -1016,6 +1037,7 @@ class PeopleTrackerFromLegs:
 				person = PersonTrack()
 				person.header.stamp = rospy.Time.now()
 				person.ConPerson = conf
+				person.AvgSizeLegPerson = self.track_size_people[_idx]
 				person.xPerson = self.track_KF_point_people[_idx][0]
 				person.yPerson = self.track_KF_point_people[_idx][1]
 				if self.use_odom:
@@ -1132,7 +1154,7 @@ def processLegArray(msg):
 		# print l
 		if l.xLeg == 0 and l.yLeg == 0:
 			continue
-		points.append([l.xLeg, l.yLeg, l.ConLeg])
+		points.append([l.xLeg, l.yLeg, l.ConLeg, l.SizeLeg])
 	if g_use_clip:
 		points = clipPoints(points, CLIP_X_ABS , CLIP_Y_MAX)
 	people_tracker.processMunkresKalman(points)
