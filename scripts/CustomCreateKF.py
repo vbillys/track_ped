@@ -44,8 +44,8 @@ def createPersonKF(x,y, dt, dt2, KF_pd = .5,  KF_pv = .20,  KF_pa = .50,  KF_rd 
 	return kalman_filter
 
 def createLegKF(x,y, dt, KF_pd = .5, KF_pv = .20, KF_rd = 0.01, KF_rv = 0.2, KF_q = 0.7):
-	# kalman_filter = KalmanFilter(dim_x=4, dim_z=2)
-	kalman_filter = KalmanFilter(dim_x=4, dim_z=4)
+	kalman_filter = KalmanFilter(dim_x=4, dim_z=2)
+	# kalman_filter = KalmanFilter(dim_x=4, dim_z=4)
 	# dt = .1
 	KF_F = np.array([[1., dt, 0 ,  0],
 		[0 , 1., 0 ,  0],
@@ -59,10 +59,10 @@ def createLegKF(x,y, dt, KF_pd = .5, KF_pv = .20, KF_rd = 0.01, KF_rv = 0.2, KF_
 	KF_P = np.diag([KF_pd, KF_pv,KF_pd, KF_pv])
 	# KF_rd = 0.05
 	# KF_rv = 0.2 #0.5
-	# KF_R = np.diag([KF_rd,KF_rd])
-	KF_R = np.diag([KF_rd,KF_rd, KF_rv, KF_rv])
-	# KF_H = np.array([[1.,0,0,0],[0,0,1.,0]])
-	KF_H = np.array([[1.,0,0,0],[0,0,1.,0],[0,1.,0,0],[0,0,0,1.]])
+	KF_R = np.diag([KF_rd,KF_rd])
+	# KF_R = np.diag([KF_rd,KF_rd, KF_rv, KF_rv])
+	KF_H = np.array([[1.,0,0,0],[0,0,1.,0]])
+	# KF_H = np.array([[1.,0,0,0],[0,0,1.,0],[0,1.,0,0],[0,0,0,1.]])
 
 	kalman_filter.x = np.array([x,0,y,0])
 	kalman_filter.F = KF_F
