@@ -32,8 +32,8 @@ g_pub_marker = None
 g_use_raw_leg_data = False
 g_no_ppl_predict_when_update_fail = False #True
 # <<<<<<< Updated upstream
-g_use_limit_ppl_predict = True
-# g_use_limit_ppl_predict = False
+#g_use_limit_ppl_predict = True
+g_use_limit_ppl_predict = False
 # =======
 # >>>>>>> Stashed changes
 #=======
@@ -745,10 +745,10 @@ class PeopleTrackerFromLegs:
 				_x_bef_updated = kf.x
 				if self.no_ppl_predict_when_update_fail:
 					if self.track_KF_onelegmode[_kidx] < 2:
-						if self.track_KF_confirmations[_kidx]:
+						#if self.track_KF_confirmations[_kidx]:
 							kf.predict()
 				else:
-					if self.track_KF_confirmations[_kidx]:
+					#if self.track_KF_confirmations[_kidx]:
 						kf.predict()
 				_x_updated = kf.x
 				if self.use_limit_ppl_predict:
@@ -889,9 +889,9 @@ class PeopleTrackerFromLegs:
 								_R = self.kalman_filters_people[_index].R
 								# mx, my, RR = getMMSEOneLegs(_check, onelegs_track, _R, self.track_KF_point_people[_index])
 								mx, my, RR = getMMSEOneLegs(_check, onelegs_track, _R, self.track_KF_point_people[_index], getPosPMatrixCAModel(self.kalman_filters_people[_index]))
-								self.kalman_filters_people[_index].R = RR
+								#self.kalman_filters_people[_index].R = RR
 								self.kalman_filters_people[_index].update([mx, my])
-								self.kalman_filters_people[_index].R = _R
+								#self.kalman_filters_people[_index].R = _R
 								kalman_filters_new.append(self.kalman_filters_people[_index])
 								track_conf_new.append(_conf)
 								track_size_new.append(_size)
@@ -1180,20 +1180,20 @@ def talker():
 	DECAY_THRES_LEG = rospy.get_param('~decay_thres_leg', .5) #0.3
 	IMPROVE_RATE = rospy.get_param('~improve_rate', 0.05) #0.02 #0.05
 	PERSON_CONFIRM_THRES = rospy.get_param('~person_confirm_thres', 0.5)
-	RMAHALANOBIS = rospy.get_param('~rmahalanobis', 2.) #.5 #2.5 #2.5
+	RMAHALANOBIS = rospy.get_param('~rmahalanobis', 2.) #2. #.5 #2.5 #2.5
 	MAX_DIST_PERSON_ONELEG = rospy.get_param('~max_dist_person_oneleg', 1) #.5 #1 #.3
 	PERSON_GATING_DISTANCE = rospy.get_param('~person_gating_distance', 0.8)
 	MAX_DIST_OWNERSHIP_ONELEG = rospy.get_param('~max_dist_ownership_oneleg', .5) #.35#.5
-	LIMIT_PPL_PREDICT = rospy.get_param('~limit_ppl_predict', .13) #0.015 #.03
+	LIMIT_PPL_PREDICT = rospy.get_param('~limit_ppl_predict', 2.13) #0.015 #.03
 	MAX_OBJ_ID = rospy.get_param('~max_id', 64)
-	SAMPLING_RATE = rospy.get_param('~sampling_rate', 40)
+	SAMPLING_RATE = rospy.get_param('~sampling_rate', 35)
 
-	person_kf_params = rospy.get_param('~person_kf_params', [.5, .2, .5, .01, .1, 1, .7])
-	leg_kf_params = rospy.get_param('~leg_kf_params', [.5, .2, .05, .2,.7])
+	person_kf_params = rospy.get_param('~person_kf_params', [.5, 0.2, 0.5, .001, .1, 5, 10.7])
+	leg_kf_params = rospy.get_param('~leg_kf_params', [.5, .2, .05, .2, 6.7])
 
 	g_use_odom = rospy.get_param('~use_odom', False)
 	g_odom_topic = rospy.get_param('~odom_topic', None)
-	g_use_limit_ppl_predict = rospy.get_param('~use_limit_ppl_predict', True)
+	g_use_limit_ppl_predict = rospy.get_param('~use_limit_ppl_predict', False)
 
 	print "sampling_rate: %d max_id: %d"% (SAMPLING_RATE, MAX_OBJ_ID)
 	print "detailed parameters:\n cost_max_gating: %.3f\n cost_max_gating_oneleg: %.3f \n decay_rate: %.3f\n decay_thres: %.3f\n decay_rate_leg: %.3f\n decay_thres_leg: %.3f\n improve_rate: %.3f\n person_confirm_thres: %.3f\n rmahalanobis: %.3f\n max_dist_person_oneleg: %.3f\n person_gating_distance: %.3f\n max_dist_ownership_oneleg: %.3f\n limit_ppl_predict: %.3f" %(COST_MAX_GATING, COST_MAX_GATING_ONELEG, DECAY_RATE, DECAY_THRES, DECAY_RATE_LEG, DECAY_THRES_LEG, IMPROVE_RATE, PERSON_CONFIRM_THRES, RMAHALANOBIS, MAX_DIST_PERSON_ONELEG, PERSON_GATING_DISTANCE, MAX_DIST_OWNERSHIP_ONELEG, LIMIT_PPL_PREDICT)
